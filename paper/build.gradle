@@ -1,0 +1,28 @@
+// Paper/Spigot plugin. Deliberately separate from the mod modules: Paper is not a mod loader,
+// it is a fork of the vanilla server exposing the Bukkit plugin API, so nothing here can share
+// code with `common` — only the wire format is shared.
+repositories {
+	maven {
+		name = 'PaperMC'
+		url = 'https://repo.papermc.io/repository/maven-public/'
+	}
+}
+
+dependencies {
+	compileOnly "io.papermc.paper:paper-api:${rootProject.paper_api_version}"
+}
+
+processResources {
+	def props = [
+		version    : project.version,
+		mod_id     : rootProject.mod_id,
+		mod_name   : rootProject.mod_name,
+		mod_author : rootProject.mod_author,
+		mod_license: rootProject.mod_license
+	]
+	props.each { k, v -> inputs.property(k, v) }
+
+	filesMatching('plugin.yml') {
+		expand props
+	}
+}

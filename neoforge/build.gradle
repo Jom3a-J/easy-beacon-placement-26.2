@@ -1,0 +1,36 @@
+plugins {
+	id 'net.neoforged.moddev'
+}
+
+neoForge {
+	version = rootProject.neoforge_version
+
+	runs {
+		client {
+			client()
+		}
+	}
+
+	mods {
+		// Registered by literal name: a GString key here silently fails to create the mod entry,
+		// and the dev run then treats the raw classes directory as a mod file and refuses to start.
+		create('easy_beacon_placement') {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+processResources {
+	def props = [
+		version    : project.version,
+		mod_id     : rootProject.mod_id,
+		mod_name   : rootProject.mod_name,
+		mod_author : rootProject.mod_author,
+		mod_license: rootProject.mod_license
+	]
+	props.each { k, v -> inputs.property(k, v) }
+
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand props
+	}
+}

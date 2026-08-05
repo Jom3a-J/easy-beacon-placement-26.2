@@ -1,0 +1,10 @@
+name: EasyBeaconPlacement
+version: '${version}'
+main: com.jom3a.easybeacon.paper.EasyBeaconPlacementPlugin
+api-version: '26.2'
+author: ${mod_author}
+description: >-
+  Server half of Easy Beacon Placement. Optional: without it, clients with the mod still work but
+  are limited by interaction range. With it, the server builds the pyramid so that limit goes away.
+  Placements are offered to the server as normal block-place events, so protection plugins still
+  apply.

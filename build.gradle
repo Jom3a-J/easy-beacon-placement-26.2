@@ -1,0 +1,45 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${fabric_loom_version}" apply false
+	id 'net.neoforged.moddev' version "${moddev_version}" apply false
+}
+
+subprojects {
+	apply plugin: 'java'
+
+	version = rootProject.mod_version
+	group = rootProject.maven_group
+
+	base {
+		archivesName = "${rootProject.mod_id}-${project.name}"
+	}
+
+	repositories {
+		mavenCentral()
+	}
+
+	java {
+		withSourcesJar()
+		sourceCompatibility = JavaVersion.VERSION_25
+		targetCompatibility = JavaVersion.VERSION_25
+	}
+
+	tasks.withType(JavaCompile).configureEach {
+		it.options.release = 25
+		it.options.encoding = 'UTF-8'
+		it.options.compilerArgs << '-Xlint:deprecation'
+	}
+
+	// The mod loaders compile the same shared sources out of ../common. The Paper plugin does not:
+	// it targets the Bukkit API rather than Minecraft's own classes, so it shares nothing but the
+	// wire format.
+	if (project.name != 'paper') {
+		sourceSets.main.java.srcDir rootProject.file('common/src/main/java')
+		sourceSets.main.resources.srcDir rootProject.file('common/src/main/resources')
+	}
+
+	tasks.withType(Jar).configureEach {
+		from(rootProject.file('LICENSE')) {
+			rename { "${it}_${rootProject.mod_id}" }
+		}
+	}
+}

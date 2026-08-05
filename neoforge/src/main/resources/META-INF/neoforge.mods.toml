@@ -1,0 +1,33 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "${mod_license}"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${version}"
+displayName = "${mod_name}"
+authors = "${mod_author}"
+logoFile = "assets/easy_beacon_placement/icon.png"
+description = '''
+Preview a beacon pyramid as a colour-coded hologram before you build it, then place the whole
+thing in one click. The preview sizes itself to the base blocks in your inventory and highlights
+anything in the way in red.
+
+Optional on the server. Install it there as well and the reach limit goes away entirely;
+singleplayer gets that automatically. Without it, the mod still works client-side alone against
+vanilla, Paper and Spigot servers.
+'''
+
+[[dependencies.easy_beacon_placement]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.2,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.easy_beacon_placement]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.2,26.3)"
+ordering = "NONE"
+side = "BOTH"

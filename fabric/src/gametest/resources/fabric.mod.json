@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "easy_beacon_placement_gametest",
+	"version": "1.0.0",
+	"name": "Easy Beacon Placement Game Tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.jom3a.easybeacon.fabric.gametest.EasyBeaconClientGameTest",
+			"com.jom3a.easybeacon.fabric.gametest.ShowcaseCapture"
+		]
+	},
+	"depends": {
+		"easy_beacon_placement": "*"
+	}
+}

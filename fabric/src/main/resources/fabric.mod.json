@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "${mod_id}",
+	"version": "${version}",
+	"name": "${mod_name}",
+	"description": "Preview a beacon pyramid as a colour-coded hologram before you build it, then place the whole thing in one click. The preview sizes itself to the base blocks in your inventory and highlights anything in the way in red. Optional on the server: install it there as well and the reach limit goes away entirely (singleplayer gets that automatically). Without it, the mod still works client-side alone against vanilla, Paper and Spigot servers.",
+	"authors": [
+		"${mod_author}"
+	],
+	"contact": {},
+	"license": "${mod_license}",
+	"icon": "assets/easy_beacon_placement/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.jom3a.easybeacon.fabric.EasyBeaconPlacementFabricCommon"
+		],
+		"client": [
+			"com.jom3a.easybeacon.fabric.EasyBeaconPlacementFabric"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

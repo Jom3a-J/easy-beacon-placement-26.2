@@ -1,0 +1,40 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+}
+
+dependencies {
+	// No `mappings` line: 26.x ships unobfuscated.
+	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+}
+
+// Creates the `gametest` source set and the `runClientGameTest` task. The tests drive a real
+// client, so they cover the parts unit tests cannot: that the hologram actually renders, and
+// that placement really puts blocks in the world.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "easy_beacon_placement_gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		// Needed for the dedicated-server test, which starts a real server process locally.
+		// Accepted by the project owner: https://www.minecraft.net/eula
+		eula = true
+	}
+}
+
+processResources {
+	def props = [
+		version    : project.version,
+		mod_id     : rootProject.mod_id,
+		mod_name   : rootProject.mod_name,
+		mod_author : rootProject.mod_author,
+		mod_license: rootProject.mod_license
+	]
+	props.each { k, v -> inputs.property(k, v) }
+
+	filesMatching('fabric.mod.json') {
+		expand props
+	}
+}

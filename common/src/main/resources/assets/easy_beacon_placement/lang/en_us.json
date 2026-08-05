@@ -1,0 +1,18 @@
+{
+	"key.category.easy_beacon_placement.main": "Easy Beacon Placement",
+	"key.easy_beacon_placement.show_hologram": "Show beacon hologram",
+	"key.easy_beacon_placement.cycle_tier": "Cycle beacon tier / cancel build",
+
+	"hud.easy_beacon_placement.ready": "§aTier %s ready§r — %s blocks to place",
+	"hud.easy_beacon_placement.downgraded": "§eTier %s blocked — you'll only get Tier %s§r (%s blocks in the way)",
+	"hud.easy_beacon_placement.unusable": "§cWon't work here§r — %s blocks in the way",
+	"hud.easy_beacon_placement.offset": "%s §7[%s]§r",
+
+	"msg.easy_beacon_placement.placing": "Building… %s blocks left",
+	"msg.easy_beacon_placement.waiting": "§e%s blocks left§r — move closer to reach them",
+	"msg.easy_beacon_placement.done": "Placed %s blocks",
+	"msg.easy_beacon_placement.partial": "Placed %s blocks — §c%s failed§r",
+	"msg.easy_beacon_placement.cancelled": "Build cancelled after %s blocks",
+	"msg.easy_beacon_placement.out_of_material": "Out of base blocks in your hotbar",
+	"msg.easy_beacon_placement.unreachable": "%s blocks couldn't be placed — move closer, or they have nothing to build against"
+}
