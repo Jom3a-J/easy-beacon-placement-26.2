@@ -36,20 +36,23 @@ public final class PlacementPlan {
 		this.slots = List.copyOf(slots);
 		this.counts = new int[STATE_COUNT];
 
-		// A beacon's tier is set by how many complete layers it has counting up from the bottom of
-		// the pyramid, so the lowest gap caps the whole thing. Tracking it here costs nothing on
+		// A beacon's tier is how many complete layers sit immediately beneath it: tier n needs
+		// layers 1..n, numbered downwards from the beacon. So it is the blocked layer *nearest the
+		// beacon* that caps the result - a hole in the bottom layer of a tier-4 pyramid still
+		// leaves a working tier 3, while a hole directly under the beacon leaves nothing at all.
+		// "Nearest" is the smallest layer number, hence the min. Tracking it here costs nothing on
 		// top of the tally that has to happen anyway.
-		int lowestBlockedLayer = Integer.MAX_VALUE;
+		int nearestBlockedLayer = Integer.MAX_VALUE;
 
 		for (Slot slot : this.slots) {
 			counts[slot.state().ordinal()]++;
 
 			if (slot.state() == SlotState.OBSTRUCTED || slot.state() == SlotState.MISSING_MATERIAL) {
-				lowestBlockedLayer = Math.min(lowestBlockedLayer, beaconPos.getY() - slot.pos().getY());
+				nearestBlockedLayer = Math.min(nearestBlockedLayer, beaconPos.getY() - slot.pos().getY());
 			}
 		}
 
-		this.effectiveTier = Math.min(tier, lowestBlockedLayer - 1);
+		this.effectiveTier = Math.min(tier, nearestBlockedLayer - 1);
 	}
 
 	public BlockPos beaconPos() {
@@ -116,6 +119,52 @@ public final class PlacementPlan {
 	 * @param maxTier   upper bound from config
 	 */
 	public static PlacementPlan compute(BlockGetter level, BlockPos beaconPos, int available, int maxTier) {
+		return compute(readTerrain(level), beaconPos, available, maxTier);
+	}
+
+	/**
+	 * What the world already holds at one position, before the player's material budget is
+	 * considered.
+	 *
+	 * <p>Answering this means reading a block state, which means block tags, which means a loaded
+	 * datapack — so asking the question directly is what would otherwise force every test of the
+	 * planning arithmetic to boot most of the game. Taking the answer as a parameter keeps
+	 * {@link #compute(TerrainReader, BlockPos, int, int)} a pure function of geometry and budget,
+	 * which is the half with the interesting edge cases.
+	 */
+	@FunctionalInterface
+	public interface TerrainReader {
+		/**
+		 * @return {@link SlotState#ALREADY_VALID} when a base block is in place,
+		 *         {@link SlotState#OBSTRUCTED} when something is in the way, or
+		 *         {@link SlotState#PLACEABLE} when the space is free. Never
+		 *         {@link SlotState#MISSING_MATERIAL} — that is a verdict on the player's inventory
+		 *         rather than on the terrain, and {@code compute} is the one that reaches it.
+		 */
+		SlotState at(BlockPos pos);
+	}
+
+	/** How the live world answers {@link TerrainReader}. */
+	private static TerrainReader readTerrain(BlockGetter level) {
+		return pos -> {
+			BlockState state = level.getBlockState(pos);
+
+			if (BeaconMaterials.isBeaconBase(state)) {
+				// Already in place: costs nothing.
+				return SlotState.ALREADY_VALID;
+			}
+
+			// Obstructed slots cannot be filled at all, so they cost nothing either.
+			return state.canBeReplaced() ? SlotState.PLACEABLE : SlotState.OBSTRUCTED;
+		};
+	}
+
+	/**
+	 * The planning itself, over whatever {@code terrain} reports.
+	 *
+	 * @see #compute(BlockGetter, BlockPos, int, int) for the version that reads a real world
+	 */
+	public static PlacementPlan compute(TerrainReader terrain, BlockPos beaconPos, int available, int maxTier) {
 		int clampedMax = Math.clamp(maxTier, BeaconPyramid.MIN_TIER, BeaconPyramid.MAX_TIER);
 
 		List<BlockPos> positions = BeaconPyramid.basePositions(beaconPos, clampedMax);
@@ -123,7 +172,7 @@ public final class PlacementPlan {
 
 		// Classify every slot of the largest candidate pyramid in one pass. Picking the tier first
 		// would mean re-reading the terrain once per tier tried, and this runs every client tick.
-		SlotState[] terrain = new SlotState[total];
+		SlotState[] states = new SlotState[total];
 		int[] costPerLayer = new int[clampedMax + 1];
 		int index = 0;
 
@@ -131,16 +180,12 @@ public final class PlacementPlan {
 			int width = BeaconPyramid.baseWidth(layer);
 
 			for (int end = index + width * width; index < end; index++) {
-				BlockState state = level.getBlockState(positions.get(index));
+				SlotState state = terrain.at(positions.get(index));
 
-				if (BeaconMaterials.isBeaconBase(state)) {
-					// Already in place: costs nothing.
-					terrain[index] = SlotState.ALREADY_VALID;
-				} else if (!state.canBeReplaced()) {
-					// Obstructed slots cannot be filled at all, so they cost nothing either.
-					terrain[index] = SlotState.OBSTRUCTED;
-				} else {
-					terrain[index] = SlotState.PLACEABLE;
+				states[index] = state;
+
+				// Free space is the only kind of slot the player has to pay for.
+				if (state == SlotState.PLACEABLE) {
 					costPerLayer[layer]++;
 				}
 			}
@@ -154,7 +199,7 @@ public final class PlacementPlan {
 		int budget = available;
 
 		for (int i = from; i < total; i++) {
-			SlotState state = terrain[i];
+			SlotState state = states[i];
 
 			// Spend the budget bottom-up, so a shortfall shows at the top where it is visible
 			// rather than hollowing out a layer the player cannot see.

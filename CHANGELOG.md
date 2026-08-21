@@ -14,6 +14,23 @@
 - One test pins the ordering `PlacementPlan.compute` depends on: it scans the largest pyramid once
   and treats a smaller tier as the tail of that scan, which only holds while positions come out
   widest layer first. Reordering them would otherwise build the wrong layers, silently.
+- **`PlacementPlan.compute` is now testable**, and tested. It takes the terrain question as a
+  `TerrainReader` rather than reaching for block tags itself, which is what previously forced any
+  test of the planning arithmetic to boot most of the game. Seventeen tests now cover tier
+  selection, the material budget, and the effective-tier rules — the cases the client game tests
+  cannot cheaply reach, since those run with a creative inventory against terrain that is either
+  wholly free or wholly obstructed. Behaviour is unchanged; the live path hands in a reader that
+  reads the world.
+
+### Fixed
+
+- A comment claiming a beacon's tier is capped by the first incomplete layer *counting up from the
+  bottom* had it backwards, in both `PlacementPlan` and the game test. Layers are numbered downwards
+  from the beacon, so it is the blocked layer **nearest the beacon** that caps the result: losing the
+  bottom layer of a tier-4 pyramid still leaves a working tier 3, while losing the 3x3 directly
+  underneath leaves nothing at all. The code was always right and is unchanged; the comment was
+  wrong in the direction that invites someone to "fix" working code, and it is what sent four of
+  these new tests down the wrong path before they were corrected against real in-game behaviour.
 
 `build` already depends on `check`, so CI runs these with no workflow change.
 

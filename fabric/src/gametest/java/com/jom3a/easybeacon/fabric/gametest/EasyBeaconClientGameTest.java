@@ -267,8 +267,9 @@ public class EasyBeaconClientGameTest implements FabricClientGameTest {
 			assertEquals(155, plan.count(SlotState.OBSTRUCTED), "obstructed slots");
 			assertEquals(0, plan.count(SlotState.MISSING_MATERIAL), "missing-material slots");
 
-			// Only the top layer is free, and a beacon's tier is capped by the first incomplete
-			// layer counting up from the bottom - so this arena can only ever power a tier 1.
+			// Only the layer directly under the beacon is free, and a beacon's tier is capped by the
+			// first incomplete layer counting *down* from the beacon - so this arena powers a tier 1
+			// and no more, however much is dug out lower down.
 			assertEquals(1, plan.effectiveTier(), "effective tier");
 
 			if (plan.isFullyBuildable()) {
