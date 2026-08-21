@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
+
+Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.
 
 ### Fixed
 
