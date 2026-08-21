@@ -102,9 +102,4 @@ GriefPrevention and similar can veto individual blocks** — anything refused is
 > servers forbid client-side automation regardless of how ordinary the packets look. Check your
 > server's rules.
 
-## Links
-
-- Source: TODO — your repository URL
-- Issues: TODO — your issue tracker URL
-
 MIT licensed. By **Jom3a**.
