@@ -110,8 +110,8 @@ public final class EbpClient {
 		// When the server has the mod it does the building: no interaction-range check to satisfy
 		// and no need for every block to have a face to be clicked against. In singleplayer the
 		// integrated server is running this same code, so that path is taken automatically.
-		if (EbpConfig.get().preferServerPlacement
-				&& EbpNetworking.tryServerBuild(plan.beaconPos(), plan.tier())) {
+		if (willBuildServerSide()) {
+			EbpNetworking.sendBuildRequest(plan.beaconPos(), plan.tier());
 			return true;
 		}
 
@@ -198,12 +198,18 @@ public final class EbpClient {
 		int maxTier = tierOverride == 0 ? config.maxTier : Math.min(tierOverride, config.maxTier);
 		maxTier = Math.min(maxTier, tierByRoom);
 
-		return PlacementPlan.compute(
-				minecraft.level,
-				beaconPos,
-				player.getInventory(),
-				config.countHotbarOnly,
-				maxTier);
+		// The two placement paths can spend different blocks: the server empties the whole
+		// inventory, while the client-side placer can only ever use a hand. Sizing the preview to
+		// blocks the placer cannot reach is what leaves a pyramid half-built and then aborts with
+		// "out of base blocks", so the budget follows whichever path this click will actually take.
+		boolean reachableOnly = config.countHotbarOnly || !willBuildServerSide();
+
+		return PlacementPlan.compute(minecraft.level, beaconPos, player, reachableOnly, maxTier);
+	}
+
+	/** Whether a build started right now would be handed to the server rather than placed by hand. */
+	private static boolean willBuildServerSide() {
+		return EbpConfig.get().preferServerPlacement && EbpNetworking.canServerBuild();
 	}
 
 	private static boolean isHoldingBeacon(LocalPlayer player) {

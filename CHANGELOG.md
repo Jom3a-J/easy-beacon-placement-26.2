@@ -1,5 +1,88 @@
 # Changelog
 
+## 1.1.0
+
+Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.
+
+### Fixed
+
+- **A beacon held in your offhand could never be placed.** The preview accepted a beacon in either
+  hand, but the client-side placer only ever looked at the hotbar — so parking the beacon in the
+  offhand and filling the hotbar with base blocks, which is the obvious way to carry both, built
+  the entire pyramid and then stalled out with "couldn't be placed" where the beacon should go.
+  Either hand now works, for base blocks as well as the beacon.
+- **Builds ran out of material halfway through.** By default the preview sized itself to every base
+  block you were carrying, but the client-side placer can only use what is in a hand. A pyramid
+  sized to your backpack therefore aborted partway with "out of base blocks". The preview now sizes
+  itself to what the path it will actually take can reach: the whole inventory when the server has
+  the mod and is doing the building, the hotbar and offhand when the client is.
+- **Paper: spawn protection was not enforced**, despite the mod, the plugin description and this
+  changelog all saying it was. A player could build inside spawn protection through the plugin
+  where they could not by hand. It now applies the same test vanilla does.
+- **Paper: blocks vanished when a refund did not fit.** If a protection plugin vetoed a placement
+  and the player's inventory was full, the refunded block was silently dropped on the floor of
+  `addItem` — and the inventory is at its fullest precisely when a build has just failed. Leftovers
+  are now dropped at the player's feet.
+- **`#RRGGBB` config colours came out invisible.** Six-digit colours were read as `AARRGGBB`, giving
+  them alpha 0. Six digits now means fully opaque, over-long values are rejected instead of being
+  truncated into something that happens to parse, and a malformed colour is reported in the log at
+  load rather than silently drawn as nothing.
+- Server-side builds no longer load — or generate — a chunk as a side effect of a request whose
+  edge falls outside the loaded area.
+- **Client-side builds gave up while you were still walking over to them.** The build ended after
+  three seconds without a block landing — but a tier-4 base is nine blocks across, and crossing it
+  to reach the far side takes longer than that, so walking to the rest of your own pyramid could
+  end the build. Moving now counts as progress and only a player who has actually stopped is given
+  up on, with a twenty-second ceiling so a build cannot follow someone who has wandered off.
+
+### Changed
+
+- The config file is rewritten after a successful load, so a file saved by an older version picks
+  up fields added since instead of leaving them to be discovered from this changelog.
+- `colorBeacon` is gone. It never did anything: the beacon's outline carries the green/amber/red
+  verdict, which has been true since the first release. Leaving it in the file only invited people
+  to set a value and wonder why nothing changed.
+- "Out of base blocks" now says which blocks it means — the two placement paths can run out for
+  quite different reasons, and only one of them means you are actually out.
+
+### Added
+
+- **NeoForge server-side placement now fires `BlockEvent.EntityPlaceEvent` per block**, so
+  land-claim and protection mods can veto individual positions exactly as they can a hand-placed
+  block — and as they already could through the Paper plugin. Refused blocks are rolled back and
+  refunded. Fired per block rather than as one `EntityMultiPlaceEvent` on purpose: a pyramid that
+  clips the corner of someone's claim loses that corner and keeps the rest, instead of the whole
+  build being silently refused. Fabric keeps direct placement — Fabric API has no block-place event
+  to fire, so there is nothing standard to offer a placement to.
+- A proper README: what it does, controls, install (and what installing server-side actually buys
+  you), the full config reference, and how to build and test the thing.
+
+### Internal
+
+- The screenshot-capture test was still using the pre-26.2 game rule names (`doDaylightCycle`,
+  `doWeatherCycle`, `doMobSpawning`, now `advance_time`, `advance_weather` and `spawn_mobs`). They
+  failed as unknown arguments, and `/gamerule` reports that to chat rather than to the test, so the
+  arena had quietly kept its day cycle and its mob spawning the whole time.
+
+### Performance
+
+Nothing here changes what you see; it changes how much work is done to show it.
+
+- The preview is worked out in **one pass over the terrain instead of up to four.** Choosing a tier
+  used to re-read every block of every candidate pyramid, largest first, until one fit — roughly
+  300 block lookups per tick at tier 4, plus a fresh list of positions for each attempt. It is now
+  a single scan of at most 164, with the tier chosen from per-layer running totals.
+- The hologram no longer **re-bakes the block model once per block, every frame.** A tier-4 preview
+  was building 165 model-part lists, 165 random sources and 165 vertex-setting objects per frame,
+  for two distinct blocks. Those are now built once per frame and shared. Colour parsing moved out
+  of the per-block loop as well.
+- `effectiveTier()` is computed once when a plan is built rather than on every call — it is read
+  once per tick and once per frame, and each call was allocating and walking the whole slot list.
+- The block-placement queue no longer searches for a support face twice per block, and picks its
+  next target without allocating a vector per candidate.
+- Server-side builds no longer restart the inventory search at slot zero for each of up to 164
+  blocks, and the Paper plugin looks up its block tags once instead of once per block.
+
 ## 1.0.0
 
 First release. Minecraft 26.2.

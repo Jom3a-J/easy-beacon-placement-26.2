@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -64,6 +65,17 @@ public final class EasyBeaconPlacementPlugin extends JavaPlugin implements Plugi
 	private static final long BUILD_COOLDOWN_MILLIS = 500L;
 
 	private final Map<UUID, Long> lastBuildAt = new HashMap<>();
+
+	/**
+	 * Block tags, looked up once instead of per block.
+	 *
+	 * <p>{@link Bukkit#getTag} is a registry lookup, and a tier-4 build asks about membership for
+	 * every one of 164 positions plus every inventory slot it walks. Resolved lazily rather than in
+	 * {@link #onEnable()} so that a server which has not finished building its registries when
+	 * plugins enable still ends up with the real tag rather than a cached null.
+	 */
+	private Tag<Material> beaconBaseTag;
+	private Tag<Material> replaceableTag;
 
 	@Override
 	public void onEnable() {
@@ -160,13 +172,15 @@ public final class EasyBeaconPlacementPlugin extends JavaPlugin implements Plugi
 		boolean ranOut = false;
 		int placed = 0;
 
+		BuildBounds bounds = new BuildBounds(player, world);
+
 		outer:
 		for (int layer = tier; layer >= 1; layer--) {
 			int y = beaconY - layer;
 
 			for (int dx = -layer; dx <= layer; dx++) {
 				for (int dz = -layer; dz <= layer; dz++) {
-					if (!canBuildAt(player, world, beaconX + dx, y, beaconZ + dz)) {
+					if (!bounds.allows(beaconX + dx, y, beaconZ + dz)) {
 						continue;
 					}
 
@@ -193,7 +207,7 @@ public final class EasyBeaconPlacementPlugin extends JavaPlugin implements Plugi
 			}
 		}
 
-		placeBeacon(player, world.getBlockAt(beaconX, beaconY, beaconZ), creative);
+		placeBeacon(player, world.getBlockAt(beaconX, beaconY, beaconZ), creative, bounds);
 
 		if (!announcedFirstBuild) {
 			announcedFirstBuild = true;
@@ -208,17 +222,79 @@ public final class EasyBeaconPlacementPlugin extends JavaPlugin implements Plugi
 		}
 	}
 
-	/** World height and world border still apply; the client supplies these coordinates. */
-	private boolean canBuildAt(Player player, World world, int x, int y, int z) {
-		if (y < world.getMinHeight() || y >= world.getMaxHeight()) {
-			return false;
+	/**
+	 * Where in the world this player is allowed to have blocks put for them, resolved once for a
+	 * whole build.
+	 *
+	 * <p>A tier-4 build asks the question 165 times, and most of the answer does not vary between
+	 * positions: the spawn-protection radius, whether it applies to this player at all, and where
+	 * spawn is. Those are settled up front, leaving a per-block check that is arithmetic plus one
+	 * world-border call — which reuses a single {@link Location} rather than allocating one per
+	 * block, since the border API takes nothing else.
+	 */
+	private static final class BuildBounds {
+		private final World world;
+		private final Location scratch;
+
+		/** Chebyshev radius around spawn this player may not build inside; 0 when unrestricted. */
+		private final int spawnRadius;
+		private final int spawnX;
+		private final int spawnZ;
+
+		BuildBounds(Player player, World world) {
+			this.world = world;
+			this.scratch = new Location(world, 0.0D, 0.0D, 0.0D);
+
+			int radius = Bukkit.getSpawnRadius();
+			List<World> worlds = Bukkit.getWorlds();
+
+			// Vanilla only protects the spawn of the main world, and never against operators.
+			boolean applies = radius > 0
+					&& !player.isOp()
+					&& !worlds.isEmpty()
+					&& worlds.get(0).equals(world);
+
+			this.spawnRadius = applies ? radius : 0;
+
+			Location spawn = applies ? world.getSpawnLocation() : null;
+			this.spawnX = spawn == null ? 0 : spawn.getBlockX();
+			this.spawnZ = spawn == null ? 0 : spawn.getBlockZ();
 		}
 
-		return world.getWorldBorder().isInside(new Location(world, x + 0.5D, y + 0.5D, z + 0.5D));
+		/**
+		 * World height, chunk loading, spawn protection and the world border, none of which the
+		 * client's coordinates are trusted to have respected.
+		 *
+		 * <p>Spawn protection is spelled out here rather than left to {@link BlockPlaceEvent}:
+		 * protection plugins hook that event, but vanilla spawn protection does not go through it.
+		 * Without this check the plugin would hand players a way to build somewhere they could not
+		 * reach by hand, which is the one thing server-side placement must never do.
+		 */
+		boolean allows(int x, int y, int z) {
+			if (y < world.getMinHeight() || y >= world.getMaxHeight()) {
+				return false;
+			}
+
+			// Never pull a chunk in — or generate one — as a side effect of a build request.
+			if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+				return false;
+			}
+
+			if (spawnRadius > 0
+					&& Math.max(Math.abs(x - spawnX), Math.abs(z - spawnZ)) <= spawnRadius) {
+				return false;
+			}
+
+			scratch.setX(x + 0.5D);
+			scratch.setY(y + 0.5D);
+			scratch.setZ(z + 0.5D);
+
+			return world.getWorldBorder().isInside(scratch);
+		}
 	}
 
-	private void placeBeacon(Player player, Block block, boolean creative) {
-		if (!canBuildAt(player, block.getWorld(), block.getX(), block.getY(), block.getZ())
+	private void placeBeacon(Player player, Block block, boolean creative, BuildBounds bounds) {
+		if (!bounds.allows(block.getX(), block.getY(), block.getZ())
 				|| !isReplaceable(block.getType())) {
 			return;
 		}
@@ -321,26 +397,43 @@ public final class EasyBeaconPlacementPlugin extends JavaPlugin implements Plugi
 		inventory.setItem(slot, stack);
 	}
 
+	/**
+	 * Returns a block that was charged for but never placed.
+	 *
+	 * <p>{@link org.bukkit.inventory.Inventory#addItem} hands back whatever did not fit rather than
+	 * throwing, and dropping that on the floor of this method would quietly delete a player's
+	 * blocks — the inventory is at its fullest precisely when a build has just failed. Anything
+	 * that will not fit goes on the ground at their feet instead, which is what vanilla does with
+	 * items a full inventory cannot take.
+	 */
 	private void giveBack(Player player, Material material) {
-		player.getInventory().addItem(new ItemStack(material));
+		for (ItemStack leftover : player.getInventory().addItem(new ItemStack(material)).values()) {
+			player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+		}
 	}
 
-	private static boolean isBeaconBase(Material material) {
-		Tag<Material> tag = Bukkit.getTag(
-				Tag.REGISTRY_BLOCKS, NamespacedKey.minecraft("beacon_base_blocks"), Material.class);
+	private boolean isBeaconBase(Material material) {
+		if (beaconBaseTag == null) {
+			beaconBaseTag = blockTag("beacon_base_blocks");
+		}
 
-		return tag != null && tag.isTagged(material);
+		return beaconBaseTag != null && beaconBaseTag.isTagged(material);
 	}
 
-	private static boolean isReplaceable(Material material) {
+	private boolean isReplaceable(Material material) {
 		if (material.isAir()) {
 			return true;
 		}
 
-		Tag<Material> tag = Bukkit.getTag(
-				Tag.REGISTRY_BLOCKS, NamespacedKey.minecraft("replaceable"), Material.class);
+		if (replaceableTag == null) {
+			replaceableTag = blockTag("replaceable");
+		}
 
-		return tag != null && tag.isTagged(material);
+		return replaceableTag != null && replaceableTag.isTagged(material);
+	}
+
+	private static Tag<Material> blockTag(String name) {
+		return Bukkit.getTag(Tag.REGISTRY_BLOCKS, NamespacedKey.minecraft(name), Material.class);
 	}
 
 	/** VarInt as Minecraft encodes it: 7 bits per byte, high bit signals continuation. */

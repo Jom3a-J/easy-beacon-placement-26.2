@@ -88,18 +88,81 @@ With nothing installed server-side, blocks are placed through the same call vani
 right-click. The server cannot tell the difference, which is why this works on **vanilla, Paper,
 Spigot, Purpur and Folia untouched** — but the server's own reach limit (4.5 blocks) then applies,
 so large pyramids need you to walk around. Out-of-reach blocks stay queued and you are told about
-them rather than losing them.
+them rather than losing them. Only what is in a hand can be placed this way — your hotbar and your
+offhand — so the preview sizes itself to those, and shows you the pyramid you can actually finish
+from where you are standing.
 
 Install the mod or the Paper plugin server-side and that limit disappears: the server places the
 structure directly.
 
 It grants nothing you could not already do by hand. The beacon must still be in your hand, blocks
-are still consumed from your inventory, and world border, world height and spawn protection are all
-enforced. On Paper every block is offered as a normal block-place event, so **WorldGuard,
-GriefPrevention and similar can veto individual blocks** — anything refused is refunded.
+are still consumed from your inventory, and world border, world height, chunk loading and spawn
+protection are all enforced. On Paper and NeoForge every block is offered to the server's own
+block-place event, so **WorldGuard, GriefPrevention and similar can veto individual blocks** —
+anything refused is refunded. (Fabric API has no block-place event to fire, so there is nothing
+standard to offer a placement to there.)
 
 > ⚠️ This is an auto-build mod, the same category as Litematica's printer or building wands. Some
 > servers forbid client-side automation regardless of how ordinary the packets look. Check your
 > server's rules.
+
+## Configuration
+
+Written to `config/easy_beacon_placement.json` on first launch. Everything is optional — the
+defaults are the intended experience. Colours are `#AARRGGBB`, or `#RRGGBB` for fully opaque.
+
+| Option | Default | What it does |
+|---|---|---|
+| `maxInFlight` | `4` | Placements awaiting server confirmation at once. `1` builds strictly one block at a time. Keep it small — a large backlog of unacknowledged predictions is what leaves holes. |
+| `preferServerPlacement` | `true` | Let the server build when it has the mod. Turn off to always place client-side, exactly as players without it experience. |
+| `maxTier` | `4` | Upper bound on the previewed tier (1–4). |
+| `countHotbarOnly` | `false` | Ignore your backpack when picking a tier. Forced on whenever the client is doing the placing, since it can only use a hand. |
+| `obstructionsThroughWalls` | `true` | Draw blockers through solid terrain. |
+| `airPreviewDistance` | `4.0` | How far ahead the beacon sits when you aim at open sky. |
+| `maxScrollOffset` | `16` | How far the wheel can nudge the beacon. |
+| `invertScroll` | `false` | Flip the wheel direction. |
+| `ghostOpacity` | `0.72` | How solid the ghost blocks look (0–1). |
+| `drawOutlines` | `true` | Wireframe outline around each previewed block. |
+| `showStatusText` | `true` | Status line above the hotbar. |
+| `boxInset` | `0.03` | Shrink each box so neighbours stay separable. |
+| `colorPlaceable` | `#FF33FF66` | Free space that will be filled. |
+| `colorAlreadyValid` | `#20FFFFFF` | A correct block is already here. |
+| `colorObstructed` | `#78FF2A2A` | Something is in the way. |
+| `colorMissingMaterial` | `#40FFC53D` | Free space, but you are out of blocks. |
+
+Out-of-range values are clamped and malformed colours are reported in the log and replaced, both
+written back to the file. The file is rewritten on load, so upgrading picks up newly added options
+rather than leaving you to find them in the changelog.
+
+## Building from source
+
+Requires **JDK 25**.
+
+```bash
+./gradlew build
+```
+
+Jars land in `fabric/build/libs/`, `neoforge/build/libs/` and `paper/build/libs/`.
+
+To run the end-to-end tests, which drive a real client and a real dedicated server:
+
+```bash
+./gradlew :fabric:runClientGameTest
+```
+
+### Project layout
+
+`common/src/main/java` is a plain source directory, **not** a Gradle subproject. Both mod loaders
+pull it in via `sourceSets.main.java.srcDir`, so each builds the shared code with its own native
+toolchain and there is no cross-loader build plugin to break on a new Minecraft version.
+
+This project deliberately does not use Architectury Loom: as of 1.17.491 it still hard-requires
+official Mojang mappings, which no longer exist now that 26.x ships unobfuscated.
+
+The Paper plugin shares nothing with the mod. Paper is not a mod loader — it is a fork of the
+vanilla server exposing the Bukkit API — so it cannot see Minecraft's own classes. The only thing
+the two sides share is the shape of the packet, pinned down in `PyramidGeometry`.
+
+See the [changelog](CHANGELOG.md) for what has changed between versions.
 
 MIT licensed. By **Jom3a**.

@@ -1,12 +1,10 @@
 package com.jom3a.easybeacon.beacon;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -14,32 +12,44 @@ import net.minecraft.world.level.block.state.BlockState;
  * A resolved decision about what to build at a given beacon position: which tier, and what the
  * mod intends to do with every block of that pyramid.
  *
- * <p>Instances are immutable snapshots. {@link com.jom3a.easybeacon.client.EbpClient} recomputes
- * one per client tick rather than per frame, and the renderer just reads it.
+ * <p>Instances are immutable snapshots, and everything worth knowing about one is worked out while
+ * it is built. {@link com.jom3a.easybeacon.client.EbpClient} recomputes a plan per client tick and
+ * the renderer reads the same one every frame, so the reads have to be free and the build itself
+ * has to be cheap.
  */
 public final class PlacementPlan {
 	/** One position in the pyramid, and what will happen to it. */
 	public record Slot(BlockPos pos, SlotState state) {
 	}
 
+	private static final int STATE_COUNT = SlotState.values().length;
+
 	private final BlockPos beaconPos;
 	private final int tier;
+	private final int effectiveTier;
 	private final List<Slot> slots;
-	private final Map<SlotState, Integer> counts;
+	private final int[] counts;
 
 	private PlacementPlan(BlockPos beaconPos, int tier, List<Slot> slots) {
 		this.beaconPos = beaconPos;
 		this.tier = tier;
 		this.slots = List.copyOf(slots);
+		this.counts = new int[STATE_COUNT];
 
-		Map<SlotState, Integer> tally = new EnumMap<>(SlotState.class);
-		for (SlotState state : SlotState.values()) {
-			tally.put(state, 0);
+		// A beacon's tier is set by how many complete layers it has counting up from the bottom of
+		// the pyramid, so the lowest gap caps the whole thing. Tracking it here costs nothing on
+		// top of the tally that has to happen anyway.
+		int lowestBlockedLayer = Integer.MAX_VALUE;
+
+		for (Slot slot : this.slots) {
+			counts[slot.state().ordinal()]++;
+
+			if (slot.state() == SlotState.OBSTRUCTED || slot.state() == SlotState.MISSING_MATERIAL) {
+				lowestBlockedLayer = Math.min(lowestBlockedLayer, beaconPos.getY() - slot.pos().getY());
+			}
 		}
-		for (Slot slot : slots) {
-			tally.merge(slot.state(), 1, Integer::sum);
-		}
-		this.counts = Map.copyOf(tally);
+
+		this.effectiveTier = Math.min(tier, lowestBlockedLayer - 1);
 	}
 
 	public BlockPos beaconPos() {
@@ -55,7 +65,7 @@ public final class PlacementPlan {
 	}
 
 	public int count(SlotState state) {
-		return counts.getOrDefault(state, 0);
+		return counts[state.ordinal()];
 	}
 
 	/** True when terrain is in the way, so the pyramid would not actually power a beacon. */
@@ -66,46 +76,20 @@ public final class PlacementPlan {
 	/**
 	 * The tier the beacon will <em>actually</em> end up at once this plan is built.
 	 *
-	 * <p>A beacon's tier is set by how many complete layers it has counting up from the bottom of
-	 * the pyramid, so a single blocked slot in a lower layer caps the whole thing. {@link #tier()}
-	 * is what the preview is sized to; this is what you will really get, and returns {@code 0} if
-	 * even the first layer cannot be completed.
+	 * <p>A single blocked slot in a lower layer caps the whole thing. {@link #tier()} is what the
+	 * preview is sized to; this is what you will really get, and is {@code 0} if even the first
+	 * layer cannot be completed.
 	 *
 	 * <p>This is the number worth showing the player: the pyramid is usually far too big to check
 	 * by eye, and much of it sits outside their field of view.
 	 */
 	public int effectiveTier() {
-		boolean[] layerBlocked = new boolean[BeaconPyramid.MAX_TIER + 2];
-
-		for (Slot slot : slots) {
-			int layer = beaconPos.getY() - slot.pos().getY();
-
-			if (layer < 1 || layer >= layerBlocked.length) {
-				continue;
-			}
-
-			if (slot.state() == SlotState.OBSTRUCTED || slot.state() == SlotState.MISSING_MATERIAL) {
-				layerBlocked[layer] = true;
-			}
-		}
-
-		int effective = 0;
-
-		// Layers have to be complete from the bottom up; the first gap caps the tier.
-		for (int layer = 1; layer <= tier; layer++) {
-			if (layerBlocked[layer]) {
-				break;
-			}
-
-			effective = layer;
-		}
-
-		return effective;
+		return effectiveTier;
 	}
 
 	/** True when building this plan yields the tier the preview is showing. */
 	public boolean isFullyBuildable() {
-		return effectiveTier() == tier;
+		return effectiveTier == tier;
 	}
 
 	/** Positions that still need a block placed, in bottom-up order. */
@@ -133,64 +117,96 @@ public final class PlacementPlan {
 	 */
 	public static PlacementPlan compute(BlockGetter level, BlockPos beaconPos, int available, int maxTier) {
 		int clampedMax = Math.clamp(maxTier, BeaconPyramid.MIN_TIER, BeaconPyramid.MAX_TIER);
-		int chosenTier = BeaconPyramid.MIN_TIER;
 
-		// Walk down from the biggest pyramid to the first one the player can actually fill.
-		for (int tier = clampedMax; tier >= BeaconPyramid.MIN_TIER; tier--) {
-			if (neededFor(level, beaconPos, tier) <= available) {
-				chosenTier = tier;
-				break;
+		List<BlockPos> positions = BeaconPyramid.basePositions(beaconPos, clampedMax);
+		int total = positions.size();
+
+		// Classify every slot of the largest candidate pyramid in one pass. Picking the tier first
+		// would mean re-reading the terrain once per tier tried, and this runs every client tick.
+		SlotState[] terrain = new SlotState[total];
+		int[] costPerLayer = new int[clampedMax + 1];
+		int index = 0;
+
+		for (int layer = clampedMax; layer >= BeaconPyramid.MIN_TIER; layer--) {
+			int width = BeaconPyramid.baseWidth(layer);
+
+			for (int end = index + width * width; index < end; index++) {
+				BlockState state = level.getBlockState(positions.get(index));
+
+				if (BeaconMaterials.isBeaconBase(state)) {
+					// Already in place: costs nothing.
+					terrain[index] = SlotState.ALREADY_VALID;
+				} else if (!state.canBeReplaced()) {
+					// Obstructed slots cannot be filled at all, so they cost nothing either.
+					terrain[index] = SlotState.OBSTRUCTED;
+				} else {
+					terrain[index] = SlotState.PLACEABLE;
+					costPerLayer[layer]++;
+				}
 			}
 		}
 
-		List<BlockPos> positions = BeaconPyramid.basePositions(beaconPos, chosenTier);
-		List<Slot> slots = new ArrayList<>(positions.size());
+		int chosenTier = chooseTier(costPerLayer, clampedMax, available);
+
+		// Layers were scanned widest first, so the chosen pyramid is exactly the tail of the scan.
+		int from = total - BeaconPyramid.blockCount(chosenTier);
+		List<Slot> slots = new ArrayList<>(total - from);
 		int budget = available;
 
-		for (BlockPos pos : positions) {
-			BlockState state = level.getBlockState(pos);
-			SlotState slotState;
+		for (int i = from; i < total; i++) {
+			SlotState state = terrain[i];
 
-			if (BeaconMaterials.isBeaconBase(state)) {
-				slotState = SlotState.ALREADY_VALID;
-			} else if (!state.canBeReplaced()) {
-				slotState = SlotState.OBSTRUCTED;
-			} else if (budget > 0) {
-				slotState = SlotState.PLACEABLE;
-				budget--;
-			} else {
-				slotState = SlotState.MISSING_MATERIAL;
+			// Spend the budget bottom-up, so a shortfall shows at the top where it is visible
+			// rather than hollowing out a layer the player cannot see.
+			if (state == SlotState.PLACEABLE) {
+				if (budget > 0) {
+					budget--;
+				} else {
+					state = SlotState.MISSING_MATERIAL;
+				}
 			}
 
-			slots.add(new Slot(pos, slotState));
+			slots.add(new Slot(positions.get(i), state));
 		}
 
 		return new PlacementPlan(beaconPos, chosenTier, slots);
 	}
 
-	/** How many blocks the player would have to supply to complete this tier as it stands. */
-	private static int neededFor(BlockGetter level, BlockPos beaconPos, int tier) {
-		int needed = 0;
+	/**
+	 * The largest tier whose free slots the player can pay for, falling back to
+	 * {@link BeaconPyramid#MIN_TIER} when they cannot afford even that.
+	 */
+	private static int chooseTier(int[] costPerLayer, int clampedMax, int available) {
+		int chosen = BeaconPyramid.MIN_TIER;
+		int cumulative = 0;
 
-		for (BlockPos pos : BeaconPyramid.basePositions(beaconPos, tier)) {
-			BlockState state = level.getBlockState(pos);
+		// Layers stack from the bottom up, so tier n costs whatever layers 1..n cost. That is
+		// monotonic, so the last tier that fits is the largest one that fits.
+		for (int tier = BeaconPyramid.MIN_TIER; tier <= clampedMax; tier++) {
+			cumulative += costPerLayer[tier];
 
-			// Blocks already in place cost nothing, and obstructed slots cannot be filled at all,
-			// so neither counts against the player's material budget.
-			if (!BeaconMaterials.isBeaconBase(state) && state.canBeReplaced()) {
-				needed++;
+			if (cumulative <= available) {
+				chosen = tier;
 			}
 		}
 
-		return needed;
+		return chosen;
 	}
 
-	/** Convenience overload that reads the budget straight off the player's inventory. */
-	public static PlacementPlan compute(BlockGetter level, BlockPos beaconPos, Inventory inventory,
-			boolean hotbarOnly, int maxTier) {
-		int available = hotbarOnly
-				? BeaconMaterials.countInHotbar(inventory)
-				: BeaconMaterials.countInInventory(inventory);
+	/**
+	 * Convenience overload that reads the budget straight off the player.
+	 *
+	 * @param reachableOnly count only what the client-side placer can reach — the hotbar and the
+	 *                      offhand — rather than the whole inventory. The server-side builder can
+	 *                      empty the backpack too, so this is false whenever it will be doing the
+	 *                      work; sizing a preview to blocks the placer cannot reach is what leaves
+	 *                      a pyramid unfinished.
+	 */
+	public static PlacementPlan compute(BlockGetter level, BlockPos beaconPos, Player player,
+			boolean reachableOnly, int maxTier) {
+		int available = reachableOnly
+				? BeaconMaterials.countReachable(player)
+				: BeaconMaterials.countInInventory(player.getInventory());
 
 		return compute(level, beaconPos, available, maxTier);
 	}

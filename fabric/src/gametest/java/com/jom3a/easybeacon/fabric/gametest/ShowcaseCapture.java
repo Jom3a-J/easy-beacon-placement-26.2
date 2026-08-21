@@ -123,9 +123,13 @@ public class ShowcaseCapture implements FabricClientGameTest {
 	private void buildArena(ClientGameTestContext context, TestSingleplayerContext sp) {
 		String[] setup = {
 			"gamemode creative @a",
-			"gamerule doDaylightCycle false",
-			"gamerule doWeatherCycle false",
-			"gamerule doMobSpawning false",
+			// 26.2 renamed the game rules to snake_case: doDaylightCycle, doWeatherCycle and
+			// doMobSpawning are now advance_time, advance_weather and spawn_mobs. The old names
+			// fail as an unknown argument, and /gamerule reports that to chat rather than to the
+			// test, so under the old names the arena quietly kept its day cycle and its mobs.
+			"gamerule advance_time false",
+			"gamerule advance_weather false",
+			"gamerule spawn_mobs false",
 			"time set noon",
 			"weather clear",
 			"fill -24 60 -24 24 63 24 minecraft:stone",

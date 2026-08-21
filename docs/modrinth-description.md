@@ -110,15 +110,19 @@ With nothing installed server-side, blocks are placed through the same call vani
 right-click. The server cannot tell the difference, which is why this works on **vanilla, Paper,
 Spigot, Purpur and Folia untouched** — but the server's own reach limit (4.5 blocks) then applies,
 so large pyramids need you to walk around. Out-of-reach blocks stay queued and you are told about
-them rather than losing them.
+them rather than losing them. Only what is in a hand can be placed this way — your hotbar and your
+offhand — so the preview sizes itself to those rather than to your whole inventory, and shows you
+the pyramid you can actually finish from where you are standing.
 
 Install the mod or the Paper plugin server-side and that limit disappears: the server places the
 structure directly.
 
 It grants nothing you could not already do by hand. The beacon must still be in your hand, blocks
-are still consumed from your inventory, and world border, world height and spawn protection are all
-enforced. On Paper every block is offered as a normal block-place event, so **WorldGuard,
-GriefPrevention and similar can veto individual blocks** — anything refused is refunded.
+are still consumed from your inventory, and world border, world height, chunk loading and spawn
+protection are all enforced. On Paper and NeoForge every block is offered to the server's own
+block-place event, so **WorldGuard, GriefPrevention and similar can veto individual blocks** —
+anything refused is refunded. (Fabric API has no block-place event to fire, so there is nothing
+standard to offer it to there.)
 
 > ⚠️ This is an auto-build mod, the same category as Litematica's printer or building wands. Some
 > servers forbid client-side automation regardless of how ordinary the packets look. Check your

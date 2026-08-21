@@ -16,7 +16,21 @@ public final class BeaconPyramid {
 	public static final int MIN_TIER = 1;
 	public static final int MAX_TIER = 4;
 
+	/** Running totals for tiers 0-4, so {@link #blockCount} is a lookup on a per-tick path. */
+	private static final int[] BLOCK_COUNTS = blockCounts();
+
 	private BeaconPyramid() {
+	}
+
+	private static int[] blockCounts() {
+		int[] counts = new int[MAX_TIER + 1];
+
+		for (int tier = MIN_TIER; tier <= MAX_TIER; tier++) {
+			int width = baseWidth(tier);
+			counts[tier] = counts[tier - 1] + width * width;
+		}
+
+		return counts;
 	}
 
 	/**
@@ -24,12 +38,7 @@ public final class BeaconPyramid {
 	 * Tiers 1-4 are 9, 34, 83 and 164 blocks.
 	 */
 	public static int blockCount(int tier) {
-		int total = 0;
-		for (int layer = 1; layer <= tier; layer++) {
-			int width = 2 * layer + 1;
-			total += width * width;
-		}
-		return total;
+		return BLOCK_COUNTS[Math.clamp(tier, 0, MAX_TIER)];
 	}
 
 	/** Width, in blocks, of the widest (bottom) layer of a pyramid of the given tier. */
