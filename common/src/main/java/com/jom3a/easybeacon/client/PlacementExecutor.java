@@ -48,14 +48,38 @@ import net.minecraft.world.phys.Vec3;
  * itself. That is strictly better than a fixed per-tick rate, which is either too slow locally or
  * too aggressive remotely.
  *
- * <p>Two limits are inherent to going through the vanilla protocol and cannot be engineered away
- * client-side: the server reach-checks every placement, and every block needs an existing face to
- * be placed against. Removing those would require a server-side component, which would cost the
- * "works on any server with nothing installed" property.
+ * <p>Three limits are inherent to going through the vanilla protocol and cannot be engineered away
+ * client-side: the server reach-checks every placement, every block needs an existing face to be
+ * placed against, and only what is in a hand can be placed at all — the hotbar and the offhand,
+ * never the backpack. Removing any of them would require a server-side component, which would cost
+ * the "works on any server with nothing installed" property. The last one is why the preview sizes
+ * itself to reachable blocks whenever this class is the one doing the building.
  */
 public final class PlacementExecutor {
-	/** Ticks of zero progress before we conclude the rest cannot be placed. */
-	private static final int STALL_LIMIT = 60;
+	/**
+	 * Ticks of zero progress, by a player who is also standing still, before we conclude the rest
+	 * cannot be placed.
+	 *
+	 * <p>Walking toward the far side of the pyramid is progress even though no block is landing —
+	 * the whole reason blocks go out of reach is that they are on the other side of a base up to
+	 * nine blocks across, and crossing that takes longer than this timer. So movement resets it,
+	 * and only a player who has actually stopped trying is given up on.
+	 */
+	private static final int IDLE_LIMIT = 60;
+
+	/**
+	 * Hard ceiling on a build that is placing nothing at all, however much the player moves.
+	 *
+	 * <p>{@link #IDLE_LIMIT} alone would let a build follow someone around forever once they lose
+	 * interest and walk off, quietly holding their hotbar slot hostage.
+	 */
+	private static final int NO_PROGRESS_LIMIT = 400;
+
+	/**
+	 * Squared distance a player has to cover in one tick to count as moving. Walking is about
+	 * 0.2 blocks a tick, so this only has to clear the jitter of standing still.
+	 */
+	private static final double MOVEMENT_EPSILON = 1.0E-4D;
 
 	/** Give a position this many tries before writing it off. */
 	private static final int MAX_ATTEMPTS = 3;
@@ -80,9 +104,14 @@ public final class PlacementExecutor {
 	private boolean running;
 	private int restoreSlot = -1;
 	private int tickCounter;
-	private int stalledTicks;
+	private int idleTicks;
+	private int noProgressTicks;
 	private int placedTotal;
 	private int failedTotal;
+
+	private double lastX;
+	private double lastY;
+	private double lastZ;
 
 	public boolean isRunning() {
 		return running;
@@ -101,9 +130,14 @@ public final class PlacementExecutor {
 		running = true;
 		restoreSlot = player.getInventory().getSelectedSlot();
 		tickCounter = 0;
-		stalledTicks = 0;
+		idleTicks = 0;
+		noProgressTicks = 0;
 		placedTotal = 0;
 		failedTotal = 0;
+
+		lastX = player.getX();
+		lastY = player.getY();
+		lastZ = player.getZ();
 	}
 
 	public void tick(Minecraft minecraft) {
@@ -122,6 +156,10 @@ public final class PlacementExecutor {
 
 		tickCounter++;
 
+		// Sampled once a tick, before anything can return early, so the movement test never
+		// compares against a position several ticks stale.
+		boolean moved = consumeMovement(player);
+
 		int settled = verifySentTargets(minecraft, level);
 		int dispatched = dispatch(minecraft, player, level, gameMode);
 
@@ -133,9 +171,10 @@ public final class PlacementExecutor {
 		}
 
 		if (settled == 0 && dispatched == 0) {
-			stalledTicks++;
+			noProgressTicks++;
+			idleTicks = moved ? 0 : idleTicks + 1;
 
-			if (stalledTicks >= STALL_LIMIT) {
+			if (idleTicks >= IDLE_LIMIT || noProgressTicks >= NO_PROGRESS_LIMIT) {
 				finish(minecraft, player,
 						Component.translatable("msg.easy_beacon_placement.unreachable", targets.size()));
 				return;
@@ -144,10 +183,24 @@ public final class PlacementExecutor {
 			showProgress(minecraft,
 					Component.translatable("msg.easy_beacon_placement.waiting", targets.size()));
 		} else {
-			stalledTicks = 0;
+			idleTicks = 0;
+			noProgressTicks = 0;
 			showProgress(minecraft,
 					Component.translatable("msg.easy_beacon_placement.placing", targets.size()));
 		}
+	}
+
+	/** Whether the player has moved since the last tick, and remembers where they are now. */
+	private boolean consumeMovement(LocalPlayer player) {
+		double dx = player.getX() - lastX;
+		double dy = player.getY() - lastY;
+		double dz = player.getZ() - lastZ;
+
+		lastX = player.getX();
+		lastY = player.getY();
+		lastZ = player.getZ();
+
+		return dx * dx + dy * dy + dz * dz > MOVEMENT_EPSILON;
 	}
 
 	/**
@@ -205,20 +258,22 @@ public final class PlacementExecutor {
 		int dispatched = 0;
 
 		while (budget > 0) {
-			Target target = nextReachableTarget(player, level);
+			Candidate candidate = nextReachableTarget(player, level);
 
-			if (target == null) {
+			if (candidate == null) {
 				break;
 			}
 
-			int slot = target.isBeacon
-					? findSlotWith(player.getInventory(), Items.BEACON)
-					: BeaconMaterials.findHotbarSlot(player.getInventory());
+			Target target = candidate.target();
+			Source source = findSource(player, target);
 
-			if (slot < 0) {
+			if (source == null) {
 				if (!target.isBeacon) {
+					// Deliberately not the same message the server-side builder uses: that one has
+					// emptied the whole inventory, whereas this one may be standing next to a
+					// backpack full of blocks it simply cannot reach from here.
 					finish(minecraft, player,
-							Component.translatable("msg.easy_beacon_placement.out_of_material"));
+							Component.translatable("msg.easy_beacon_placement.out_of_reachable_material"));
 					return dispatched;
 				}
 
@@ -227,19 +282,14 @@ public final class PlacementExecutor {
 
 			// Changing the selected slot only reaches the server via the carried-item packet the
 			// player sends on its own tick. Placing in the same tick races that packet and the
-			// server uses whatever it still thinks is held, so switch now and place later.
-			if (player.getInventory().getSelectedSlot() != slot) {
-				player.getInventory().setSelectedSlot(slot);
+			// server uses whatever it still thinks is held, so switch now and place later. An
+			// offhand placement needs no switch at all, which is part of why it is worth using.
+			if (source.needsSwitch(player)) {
+				player.getInventory().setSelectedSlot(source.hotbarSlot());
 				return dispatched;
 			}
 
-			BlockHitResult hit = findSupportFace(level, player, target.pos);
-
-			if (hit == null) {
-				break;
-			}
-
-			gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
+			gameMode.useItemOn(player, source.hand(), candidate.hit());
 
 			target.sentOnTick = tickCounter;
 			target.attempts++;
@@ -250,13 +300,20 @@ public final class PlacementExecutor {
 		return dispatched;
 	}
 
+	/** One position that can be placed right now, together with the face to click to do it. */
+	private record Candidate(Target target, BlockHitResult hit) {
+	}
+
 	/**
 	 * The closest unsent position that can actually be placed right now. Nearest-first keeps the
 	 * build inside reach for as long as possible and makes it read as growing outward from you.
+	 *
+	 * <p>The support face is handed back rather than left for the caller to find again: locating it
+	 * costs up to six block lookups, and this runs over every remaining target on every dispatch.
 	 */
-	private Target nextReachableTarget(LocalPlayer player, ClientLevel level) {
+	private Candidate nextReachableTarget(LocalPlayer player, ClientLevel level) {
 		Vec3 eye = player.getEyePosition();
-		Target best = null;
+		Candidate best = null;
 		double bestDistance = Double.MAX_VALUE;
 
 		for (Target target : targets) {
@@ -264,25 +321,38 @@ public final class PlacementExecutor {
 				continue;
 			}
 
-			BlockState state = level.getBlockState(target.pos);
+			double distance = distanceSqrToCentre(eye, target.pos);
 
-			if (!state.canBeReplaced() || !player.isWithinBlockInteractionRange(target.pos, 0.0D)) {
+			// Distance first: a target that cannot beat the current best never has to be checked
+			// against the world at all, and that check is the expensive half of this loop.
+			if (distance >= bestDistance) {
 				continue;
 			}
 
-			if (findSupportFace(level, player, target.pos) == null) {
+			if (!player.isWithinBlockInteractionRange(target.pos, 0.0D)
+					|| !level.getBlockState(target.pos).canBeReplaced()) {
 				continue;
 			}
 
-			double distance = eye.distanceToSqr(Vec3.atCenterOf(target.pos));
+			BlockHitResult hit = findSupportFace(level, player, target.pos);
 
-			if (distance < bestDistance) {
-				bestDistance = distance;
-				best = target;
+			if (hit == null) {
+				continue;
 			}
+
+			bestDistance = distance;
+			best = new Candidate(target, hit);
 		}
 
 		return best;
+	}
+
+	private static double distanceSqrToCentre(Vec3 from, BlockPos pos) {
+		double dx = from.x - (pos.getX() + 0.5D);
+		double dy = from.y - (pos.getY() + 0.5D);
+		double dz = from.z - (pos.getZ() + 0.5D);
+
+		return dx * dx + dy * dy + dz * dz;
 	}
 
 	private static boolean hasExpectedBlock(ClientLevel level, Target target) {
@@ -335,7 +405,8 @@ public final class PlacementExecutor {
 	private void reset(LocalPlayer player) {
 		targets.clear();
 		running = false;
-		stalledTicks = 0;
+		idleTicks = 0;
+		noProgressTicks = 0;
 
 		if (player != null && restoreSlot >= 0) {
 			player.getInventory().setSelectedSlot(restoreSlot);
@@ -377,15 +448,48 @@ public final class PlacementExecutor {
 		return null;
 	}
 
-	private static int findSlotWith(Inventory inventory, net.minecraft.world.item.Item item) {
-		for (int slot = 0; slot < BeaconMaterials.HOTBAR_SIZE; slot++) {
-			ItemStack stack = inventory.getItem(slot);
+	/**
+	 * Where a target's item is coming from: which hand to place with, and the hotbar slot that has
+	 * to be selected first, or {@code -1} when there is nothing to select.
+	 */
+	private record Source(InteractionHand hand, int hotbarSlot) {
+		static final Source OFFHAND = new Source(InteractionHand.OFF_HAND, -1);
 
-			if (stack.is(item)) {
-				return slot;
-			}
+		static Source mainHand(int slot) {
+			return new Source(InteractionHand.MAIN_HAND, slot);
 		}
 
-		return -1;
+		boolean needsSwitch(LocalPlayer player) {
+			return hotbarSlot >= 0 && player.getInventory().getSelectedSlot() != hotbarSlot;
+		}
+	}
+
+	/**
+	 * Which hand to place {@code target} from, or {@code null} when the player is carrying nothing
+	 * that would do it.
+	 *
+	 * <p>The hotbar is preferred, but the offhand is a real fallback rather than a nicety. Parking
+	 * the beacon in the offhand and filling the hotbar with base blocks is the obvious way to carry
+	 * both, and vanilla is perfectly happy to place from either hand — so ignoring the offhand
+	 * meant the beacon at the top of the pyramid could never be placed and the whole build stalled
+	 * out as "unreachable".
+	 */
+	private static Source findSource(LocalPlayer player, Target target) {
+		Inventory inventory = player.getInventory();
+
+		int slot = target.isBeacon
+				? BeaconMaterials.findHotbarSlot(inventory, Items.BEACON)
+				: BeaconMaterials.findHotbarSlot(inventory);
+
+		if (slot >= 0) {
+			return Source.mainHand(slot);
+		}
+
+		ItemStack offhand = player.getOffhandItem();
+		boolean offhandFits = target.isBeacon
+				? offhand.is(Items.BEACON)
+				: BeaconMaterials.baseBlockOf(offhand) != null;
+
+		return offhandFits ? Source.OFFHAND : null;
 	}
 }

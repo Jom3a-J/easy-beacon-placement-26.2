@@ -1,8 +1,6 @@
 package com.jom3a.easybeacon.net;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -108,8 +106,9 @@ public final class ServerPyramidBuilder {
 			return;
 		}
 
-		List<BlockPos> placed = new ArrayList<>();
-		BlockState placedState = null;
+		BaseBlockSupply supply = new BaseBlockSupply(player);
+		BlockPos lastPlaced = null;
+		BlockState lastState = null;
 		boolean ranOut = false;
 
 		for (BlockPos pos : BeaconPyramid.basePositions(beaconPos, tier)) {
@@ -124,7 +123,7 @@ public final class ServerPyramidBuilder {
 				continue;
 			}
 
-			Block block = takeBaseBlock(player);
+			Block block = supply.take();
 
 			if (block == null) {
 				ranOut = true;
@@ -132,15 +131,22 @@ public final class ServerPyramidBuilder {
 			}
 
 			BlockState state = block.defaultBlockState();
-			level.setBlockAndUpdate(pos, state);
-			placed.add(pos);
-			placedState = state;
+
+			// Refused by a land-claim mod: the world has already been put back, so the only thing
+			// left is to stop charging the player for a block that never went anywhere.
+			if (!ServerBlockPlacer.place(player, level, pos, state)) {
+				supply.refund(block);
+				continue;
+			}
+
+			lastState = state;
+			lastPlaced = pos;
 		}
 
 		placeBeacon(player, level, beaconPos);
 
-		if (placedState != null && !placed.isEmpty()) {
-			playPlacementSound(level, placed.getLast(), placedState);
+		if (lastPlaced != null) {
+			playPlacementSound(level, lastPlaced, lastState);
 		}
 
 		if (ranOut) {
@@ -154,56 +160,125 @@ public final class ServerPyramidBuilder {
 			return;
 		}
 
-		if (!player.isCreative() && !takeItem(player.getInventory(), stack -> stack.is(Items.BEACON))) {
+		boolean charged = !player.isCreative();
+
+		if (charged && !takeBeacon(player.getInventory())) {
 			return;
 		}
 
 		BlockState state = Blocks.BEACON.defaultBlockState();
-		level.setBlockAndUpdate(beaconPos, state);
+
+		if (!ServerBlockPlacer.place(player, level, beaconPos, state)) {
+			if (charged) {
+				giveBack(player, new ItemStack(Items.BEACON));
+			}
+
+			return;
+		}
+
 		playPlacementSound(level, beaconPos, state);
+	}
+
+	/**
+	 * Returns an item that was charged for but never placed.
+	 *
+	 * <p>Vanilla's own "put this back, and drop whatever will not fit" helper. Quietly voiding it
+	 * would be the worse failure: an inventory is at its fullest exactly when a build has just been
+	 * refused.
+	 */
+	private static void giveBack(ServerPlayer player, ItemStack stack) {
+		player.getInventory().placeItemBackInInventory(stack);
 	}
 
 	private static boolean isCloseEnough(ServerPlayer player, BlockPos beaconPos) {
 		return player.blockPosition().distSqr(beaconPos) <= (double) MAX_BUILD_DISTANCE * MAX_BUILD_DISTANCE;
 	}
 
-	/** World bounds, world border and spawn protection all still apply. */
+	/**
+	 * World bounds, chunk loading, world border and spawn protection all still apply.
+	 *
+	 * <p>{@code mayInteract} covers the last two on its own, but they are the two that decide
+	 * whether this is a build tool or a griefing tool, so the spawn-protection check is spelled out
+	 * rather than left resting on an implementation detail of a vanilla method.
+	 *
+	 * <p>The loaded check matters because a request can name a position a little further out than
+	 * the player can see. Placing there would drag a chunk into memory — and generate it, if it has
+	 * never existed — as a side effect of a build the player asked for somewhere else entirely.
+	 */
 	private static boolean canBuildAt(ServerPlayer player, ServerLevel level, BlockPos pos) {
 		return level.isInWorldBounds(pos)
+				&& level.isLoaded(pos)
 				&& level.mayInteract(player, pos)
 				&& !level.getServer().isUnderSpawnProtection(level, pos, player);
 	}
 
 	/**
-	 * Consumes one beacon base block from the player's inventory and returns which block it was,
-	 * or {@code null} if they have none left. Creative players are not charged.
+	 * Hands out the player's beacon base blocks one at a time, remembering how far through the
+	 * inventory it has got.
+	 *
+	 * <p>A pyramid is up to 164 blocks, and slots only ever empty as a build goes on, so restarting
+	 * the search at slot zero for every one of them re-walks a stretch of inventory that is already
+	 * known to be spent.
 	 */
-	private static Block takeBaseBlock(ServerPlayer player) {
-		Inventory inventory = player.getInventory();
+	private static final class BaseBlockSupply {
+		private final ServerPlayer player;
+		private final Inventory inventory;
+		private final boolean creative;
 
-		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-			ItemStack stack = inventory.getItem(slot);
-			Block block = BeaconMaterials.baseBlockOf(stack);
+		private int cursor;
 
-			if (block == null) {
-				continue;
-			}
-
-			if (!player.isCreative()) {
-				stack.shrink(1);
-			}
-
-			return block;
+		BaseBlockSupply(ServerPlayer player) {
+			this.player = player;
+			this.inventory = player.getInventory();
+			this.creative = player.isCreative();
 		}
 
-		return null;
+		/**
+		 * Hands a block back after a placement was refused.
+		 *
+		 * <p>The cursor rewinds, because the refunded stack may well land behind where the search
+		 * had already reached — and a block the player is holding that this cannot find again is
+		 * indistinguishable from having lost it.
+		 */
+		void refund(Block block) {
+			if (creative) {
+				return;
+			}
+
+			giveBack(player, new ItemStack(block));
+			cursor = 0;
+		}
+
+		/**
+		 * Consumes one beacon base block and returns which block it was, or {@code null} once the
+		 * player has none left. Creative players are not charged, so the cursor simply parks on
+		 * their first stack.
+		 */
+		Block take() {
+			for (; cursor < inventory.getContainerSize(); cursor++) {
+				ItemStack stack = inventory.getItem(cursor);
+				Block block = BeaconMaterials.baseBlockOf(stack);
+
+				if (block == null) {
+					continue;
+				}
+
+				if (!creative) {
+					stack.shrink(1);
+				}
+
+				return block;
+			}
+
+			return null;
+		}
 	}
 
-	private static boolean takeItem(Inventory inventory, java.util.function.Predicate<ItemStack> match) {
+	private static boolean takeBeacon(Inventory inventory) {
 		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
 			ItemStack stack = inventory.getItem(slot);
 
-			if (match.test(stack)) {
+			if (stack.is(Items.BEACON)) {
 				stack.shrink(1);
 				return true;
 			}

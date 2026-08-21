@@ -13,6 +13,7 @@
 	"msg.easy_beacon_placement.done": "Placed %s blocks",
 	"msg.easy_beacon_placement.partial": "Placed %s blocks — §c%s failed§r",
 	"msg.easy_beacon_placement.cancelled": "Build cancelled after %s blocks",
-	"msg.easy_beacon_placement.out_of_material": "Out of base blocks in your hotbar",
+	"msg.easy_beacon_placement.out_of_material": "Out of beacon base blocks",
+	"msg.easy_beacon_placement.out_of_reachable_material": "§eNo base blocks left in your hotbar or offhand§r — move some there",
 	"msg.easy_beacon_placement.unreachable": "%s blocks couldn't be placed — move closer, or they have nothing to build against"
 }

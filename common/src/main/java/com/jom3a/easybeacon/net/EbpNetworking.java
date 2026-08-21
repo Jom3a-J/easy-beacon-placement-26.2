@@ -31,17 +31,23 @@ public final class EbpNetworking {
 	}
 
 	/**
-	 * Asks the server to build the pyramid.
+	 * Whether the server has the mod and can build on the client's behalf.
 	 *
-	 * @return true if the request was sent, meaning the client should not build it itself; false
-	 *         when the server does not have the mod, leaving the client-side placer to do the job
+	 * <p>This is asked while the preview is still being drawn, not only at the moment of the click:
+	 * the two paths can spend different blocks — the server empties the whole inventory, the
+	 * client-side placer only what is in a hand — so the preview has to know which one it is sizing
+	 * itself for.
 	 */
-	public static boolean tryServerBuild(BlockPos beaconPos, int tier) {
-		if (clientSender == null || !clientSender.canSend()) {
-			return false;
-		}
+	public static boolean canServerBuild() {
+		return clientSender != null && clientSender.canSend();
+	}
 
-		clientSender.send(new BuildPyramidPayload(beaconPos, tier));
-		return true;
+	/**
+	 * Asks the server to build the pyramid. Only call this when {@link #canServerBuild()} is true.
+	 */
+	public static void sendBuildRequest(BlockPos beaconPos, int tier) {
+		if (clientSender != null) {
+			clientSender.send(new BuildPyramidPayload(beaconPos, tier));
+		}
 	}
 }

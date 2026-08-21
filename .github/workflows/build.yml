@@ -22,12 +22,16 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
-        run: ./gradlew build
+        # The gametest source set is not wired into `check`, so it has to be named explicitly or
+        # a test that no longer compiles goes unnoticed until someone runs it locally.
+        run: ./gradlew build :fabric:compileGametestJava
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: Artifacts
           # Jars are produced per platform module; the root project builds nothing itself.
+          # The Paper plugin is a separate download for server owners, so it ships too.
           path: |
             fabric/build/libs/
             neoforge/build/libs/
+            paper/build/libs/

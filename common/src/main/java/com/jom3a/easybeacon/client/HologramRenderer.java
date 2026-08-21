@@ -41,6 +41,13 @@ import net.minecraft.world.phys.shapes.Shapes;
  * <p>26.2 note: {@code MultiBufferSource} is gone, so geometry is handed to a
  * {@link SubmitNodeCollector}. Both Fabric and NeoForge supply the same vanilla
  * {@code (PoseStack, SubmitNodeCollector)} pair, which is why this renderer is shared.
+ *
+ * <h2>Per-frame cost</h2>
+ *
+ * <p>A tier-4 preview is 165 blocks and this runs every frame, so anything that does not vary
+ * between blocks is worked out once at the top of {@link #render} and passed down: the baked model
+ * parts, the shared quad settings, and the four configured colours. Doing any of that per block is
+ * how a preview turns into a frame-rate problem.
  */
 public final class HologramRenderer {
 	/** Packed lightmap coords for "fully lit" — block light 15, sky light 15. */
@@ -62,60 +69,87 @@ public final class HologramRenderer {
 		Vec3 camera = minecraft.gameRenderer.mainCamera().position();
 		BlockStateModelSet models = minecraft.getModelManager().getBlockStateModelSet();
 
-		Block previewBlock = BeaconMaterials.previewBlock(minecraft.player.getInventory());
+		Block previewBlock = BeaconMaterials.previewBlock(minecraft.player);
 		BlockState ghostState = (previewBlock == null ? Blocks.IRON_BLOCK : previewBlock).defaultBlockState();
+
+		Ghost baseGhost = Ghost.of(models, ghostState, plan.beaconPos(), config);
+		Ghost beaconGhost = Ghost.of(models, Blocks.BEACON.defaultBlockState(), plan.beaconPos(), config);
+
+		int placeableColour = config.placeableColor();
+		int obstructedColour = config.obstructedColor();
+		int missingColour = config.missingMaterialColor();
+		int alreadyValidColour = config.alreadyValidColor();
 
 		for (PlacementPlan.Slot slot : plan.slots()) {
 			switch (slot.state()) {
-				case PLACEABLE -> drawGhost(poseStack, collector, config, models, slot.pos(), camera,
-						ghostState, config.placeableColor());
+				case PLACEABLE -> drawGhost(poseStack, collector, config, baseGhost, slot.pos(), camera,
+						placeableColour);
 
 				// Drawn through terrain: these are the blocks the player needs to go dig out.
 				// Note the collector batches geometry per render type, so submission order does
 				// not decide what ends up on top between types - only alpha does.
 				case OBSTRUCTED -> drawMarker(poseStack, collector, config, slot.pos(), camera,
-						config.obstructedColor(), config.obstructionsThroughWalls);
+						obstructedColour, config.obstructionsThroughWalls);
 
 				case MISSING_MATERIAL -> drawMarker(poseStack, collector, config, slot.pos(), camera,
-						config.missingMaterialColor(), false);
+						missingColour, false);
 
 				// Already correct - a faint outline is enough, a ghost would just add noise.
 				case ALREADY_VALID -> drawOutlineOnly(poseStack, collector, config, slot.pos(), camera,
-						config.alreadyValidColor());
+						alreadyValidColour);
 			}
 		}
 
 		// The beacon's own outline carries the verdict. The pyramid is far too big to check by
 		// eye and much of it sits off-screen, so the one thing the player is already looking at -
 		// the beacon itself - is where the answer belongs.
-		drawGhost(poseStack, collector, config, models, plan.beaconPos(), camera,
-				Blocks.BEACON.defaultBlockState(), verdictColour(config, plan));
+		drawGhost(poseStack, collector, config, beaconGhost, plan.beaconPos(), camera,
+				verdictColour(plan, placeableColour, obstructedColour, missingColour));
 	}
 
 	/**
-	 * A translucent copy of a real block model, tinted to show what the slot means.
+	 * Everything a translucent block ghost needs that is the same for every position it is drawn
+	 * at: the baked model parts, and the vertex settings applied to all of them.
 	 *
-	 * <p>NeoForge deprecates the vanilla {@code collectParts} in favour of an overload taking its
-	 * own {@code ModelData} (for connected textures and similar). Fabric has no such overload, and
-	 * beacon base blocks are plain full cubes with no model data, so the vanilla call is both the
-	 * correct one here and the only one that compiles on both platforms.
+	 * <p>Both are shared across the whole frame rather than rebuilt per block. That is safe because
+	 * the submitted geometry callbacks may not run until after the loop has finished, so anything
+	 * handed to them has to be immutable for the rest of the frame anyway — and it is what keeps a
+	 * 165-block preview from baking the same model 165 times.
 	 */
-	@SuppressWarnings("deprecation")
-	private static void drawGhost(PoseStack poseStack, SubmitNodeCollector collector, EbpConfig config,
-			BlockStateModelSet models, BlockPos pos, Vec3 camera, BlockState state, int outlineColour) {
-		List<BlockStateModelPart> parts = new ArrayList<>();
-		models.get(state).collectParts(RandomSource.create(pos.asLong()), parts);
+	private record Ghost(List<BlockStateModelPart> parts, QuadInstance quadInstance) {
+		/**
+		 * NeoForge deprecates the vanilla {@code collectParts} in favour of an overload taking its
+		 * own {@code ModelData} (for connected textures and similar). Fabric has no such overload,
+		 * and beacon base blocks are plain full cubes with no model data, so the vanilla call is
+		 * both the correct one here and the only one that compiles on both platforms.
+		 *
+		 * <p>The model random is seeded once from the beacon position rather than per block. Base
+		 * blocks are single-variant full cubes, so this picks the same model the per-position seed
+		 * would have — and on a hypothetical multi-variant one, a preview that does not shimmer
+		 * from block to block is the better answer regardless.
+		 */
+		@SuppressWarnings("deprecation")
+		static Ghost of(BlockStateModelSet models, BlockState state, BlockPos seedPos, EbpConfig config) {
+			List<BlockStateModelPart> parts = new ArrayList<>();
+			models.get(state).collectParts(RandomSource.create(seedPos.asLong()), parts);
 
-		if (parts.isEmpty()) {
+			QuadInstance quadInstance = new QuadInstance();
+			// White, not the state colour: a previewed iron block should still look like iron. The
+			// state is communicated by the outline drawn around it.
+			quadInstance.setColor(config.ghostTint());
+			quadInstance.setLightCoords(FULL_BRIGHT);
+			quadInstance.setOverlayCoords(OverlayTexture.NO_OVERLAY);
+
+			return new Ghost(List.copyOf(parts), quadInstance);
+		}
+	}
+
+	/** A translucent copy of a real block model, outlined to show what the slot means. */
+	private static void drawGhost(PoseStack poseStack, SubmitNodeCollector collector, EbpConfig config,
+			Ghost ghost, BlockPos pos, Vec3 camera, int outlineColour) {
+		if (ghost.parts().isEmpty()) {
 			return;
 		}
-
-		QuadInstance quadInstance = new QuadInstance();
-		// White, not the state colour: a previewed iron block should still look like iron. The
-		// state is communicated by the outline drawn around it.
-		quadInstance.setColor(config.ghostTint());
-		quadInstance.setLightCoords(FULL_BRIGHT);
-		quadInstance.setOverlayCoords(OverlayTexture.NO_OVERLAY);
 
 		poseStack.pushPose();
 		translateToBlock(poseStack, pos, camera);
@@ -124,7 +158,7 @@ public final class HologramRenderer {
 		collector.submitCustomGeometry(
 				poseStack,
 				RenderTypes.translucentMovingBlock(),
-				(pose, consumer) -> emitModel(pose, consumer, parts, quadInstance));
+				(pose, consumer) -> emitModel(pose, consumer, ghost.parts(), ghost.quadInstance()));
 
 		poseStack.popPose();
 
@@ -248,14 +282,12 @@ public final class HologramRenderer {
 	 * Green when the pyramid will reach the tier being previewed, amber when it will only manage
 	 * a lower tier, red when it will not work at all.
 	 */
-	private static int verdictColour(EbpConfig config, PlacementPlan plan) {
-		int effective = plan.effectiveTier();
-
-		if (effective == plan.tier()) {
-			return config.placeableColor();
+	private static int verdictColour(PlacementPlan plan, int ready, int unusable, int downgraded) {
+		if (plan.isFullyBuildable()) {
+			return ready;
 		}
 
-		return effective == 0 ? config.obstructedColor() : config.missingMaterialColor();
+		return plan.effectiveTier() == 0 ? unusable : downgraded;
 	}
 
 	private static boolean isTransparent(int argb) {

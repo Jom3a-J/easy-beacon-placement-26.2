@@ -258,7 +258,7 @@ public class EasyBeaconClientGameTest implements FabricClientGameTest {
 			PlacementPlan plan = PlacementPlan.compute(
 					minecraft.level,
 					BEACON_OBSTRUCTED,
-					minecraft.player.getInventory(),
+					minecraft.player,
 					false,
 					4);
 
@@ -336,7 +336,7 @@ public class EasyBeaconClientGameTest implements FabricClientGameTest {
 
 		context.runOnClient(minecraft -> {
 			PlacementPlan plan = PlacementPlan.compute(
-					minecraft.level, BEACON_OPEN, minecraft.player.getInventory(), false, 1);
+					minecraft.level, BEACON_OPEN, minecraft.player, false, 1);
 
 			assertEquals(1, plan.tier(), "tier");
 			assertEquals(9, plan.count(SlotState.PLACEABLE), "placeable slots");

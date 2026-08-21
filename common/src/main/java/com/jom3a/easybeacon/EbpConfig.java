@@ -9,7 +9,7 @@ import java.nio.file.Path;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 
 /**
  * Plain JSON config, loaded once at client start from {@code config/easy_beacon_placement.json}.
@@ -22,7 +22,13 @@ import com.google.gson.JsonSyntaxException;
 public final class EbpConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-	private static EbpConfig instance = new EbpConfig();
+	private static final String COLOR_PLACEABLE = "#FF33FF66";
+	private static final String COLOR_ALREADY_VALID = "#20FFFFFF";
+	private static final String COLOR_OBSTRUCTED = "#78FF2A2A";
+	private static final String COLOR_MISSING_MATERIAL = "#40FFC53D";
+
+	// Written on the loader's thread at start-up, read from the client tick and render threads.
+	private static volatile EbpConfig instance = new EbpConfig();
 
 	// --- placement -------------------------------------------------------------------------
 
@@ -52,9 +58,13 @@ public final class EbpConfig {
 	public int maxTier = 4;
 
 	/**
-	 * Count only hotbar blocks when picking a tier. The placer can only ever use the hotbar, so
-	 * turning this on makes the preview strictly match what can actually be built right now.
-	 * Off by default, so the preview reflects everything you are carrying.
+	 * Count only the base blocks in your hotbar and offhand when picking a tier, ignoring the rest
+	 * of your inventory.
+	 *
+	 * <p>This is forced on whenever the client is doing the placing, because the placer can only
+	 * ever use a hand — so the preview always matches what can really be built. Turning it on by
+	 * hand is only worth it when the server has the mod and you would still rather the preview
+	 * ignored your backpack.
 	 */
 	public boolean countHotbarOnly = false;
 
@@ -96,26 +106,26 @@ public final class EbpConfig {
 	/** Shrink each hologram box slightly so adjacent boxes stay visually separable. */
 	public double boxInset = 0.03D;
 
-	// --- colours (0xAARRGGBB) ---------------------------------------------------------------
+	// --- colours ----------------------------------------------------------------------------
+	//
+	// Written as #AARRGGBB, or #RRGGBB for a fully opaque colour. Anything else is reported in the
+	// log at load and replaced with the default, rather than drawn as an invisible box.
 
 	/** Free space that will be filled. Used for the outline; the ghost itself is white-tinted. */
-	public String colorPlaceable = "#FF33FF66";
+	public String colorPlaceable = COLOR_PLACEABLE;
 
 	/** A correct block is already here. */
-	public String colorAlreadyValid = "#20FFFFFF";
+	public String colorAlreadyValid = COLOR_ALREADY_VALID;
 
 	/**
 	 * Something is in the way. Kept fairly transparent because these are drawn through terrain
 	 * and stack up behind one another - a whole tier-4 footprint of them would otherwise read as
 	 * a solid wall of red.
 	 */
-	public String colorObstructed = "#78FF2A2A";
+	public String colorObstructed = COLOR_OBSTRUCTED;
 
 	/** Free space, but you have run out of blocks. */
-	public String colorMissingMaterial = "#40FFC53D";
-
-	/** The beacon's own position. Used for the outline; the ghost itself is white-tinted. */
-	public String colorBeacon = "#FF40C4FF";
+	public String colorMissingMaterial = COLOR_MISSING_MATERIAL;
 
 	// ---------------------------------------------------------------------------------------
 
@@ -123,20 +133,27 @@ public final class EbpConfig {
 		return instance;
 	}
 
-	/** Loads the config from {@code configDir}, writing defaults if it is absent or broken. */
+	/**
+	 * Loads the config from {@code configDir}, writing defaults if it is absent or broken.
+	 *
+	 * <p>A file that loaded cleanly is written straight back out, so a config saved by an older
+	 * version picks up any fields added since — and any value that had to be repaired is repaired
+	 * on disk too, rather than being silently corrected on every launch.
+	 */
 	public static void load(Path configDir) {
-		Path file = configDir.resolve(EasyBeaconPlacement.MOD_ID + ".json");
+		Path file = configFile(configDir);
 
 		if (Files.exists(file)) {
 			try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 				EbpConfig loaded = GSON.fromJson(reader, EbpConfig.class);
 
 				if (loaded != null) {
+					loaded.clamp();
 					instance = loaded;
-					instance.clamp();
+					save(configDir);
 					return;
 				}
-			} catch (IOException | JsonSyntaxException e) {
+			} catch (IOException | JsonParseException e) {
 				EasyBeaconPlacement.LOGGER.warn("Could not read {}, falling back to defaults", file, e);
 			}
 		}
@@ -146,7 +163,7 @@ public final class EbpConfig {
 	}
 
 	public static void save(Path configDir) {
-		Path file = configDir.resolve(EasyBeaconPlacement.MOD_ID + ".json");
+		Path file = configFile(configDir);
 
 		try {
 			Files.createDirectories(configDir);
@@ -159,6 +176,10 @@ public final class EbpConfig {
 		}
 	}
 
+	private static Path configFile(Path configDir) {
+		return configDir.resolve(EasyBeaconPlacement.MOD_ID + ".json");
+	}
+
 	private void clamp() {
 		// Capped hard: beyond a handful the prediction desync described above sets in.
 		maxInFlight = Math.clamp(maxInFlight, 1, 16);
@@ -167,6 +188,13 @@ public final class EbpConfig {
 		boxInset = Math.clamp(boxInset, 0.0D, 0.4D);
 		airPreviewDistance = Math.clamp(airPreviewDistance, 1.0D, 16.0D);
 		ghostOpacity = Math.clamp(ghostOpacity, 0.05D, 1.0D);
+
+		// Repaired once, at load, rather than at every read: a typo that only ever surfaces as an
+		// invisible hologram gives the player nothing to go on.
+		colorPlaceable = checkedColor(colorPlaceable, COLOR_PLACEABLE);
+		colorAlreadyValid = checkedColor(colorAlreadyValid, COLOR_ALREADY_VALID);
+		colorObstructed = checkedColor(colorObstructed, COLOR_OBSTRUCTED);
+		colorMissingMaterial = checkedColor(colorMissingMaterial, COLOR_MISSING_MATERIAL);
 	}
 
 	// --- colour helpers ---------------------------------------------------------------------
@@ -196,22 +224,49 @@ public final class EbpConfig {
 		return parseColor(colorMissingMaterial, 0x40FFC53D);
 	}
 
-	public int beaconColor() {
-		return parseColor(colorBeacon, 0xFF40C4FF);
+	private static String checkedColor(String value, String fallback) {
+		if (tryParseColor(value) >= 0L) {
+			return value;
+		}
+
+		EasyBeaconPlacement.LOGGER.warn(
+				"Config colour \"{}\" is not #RRGGBB or #AARRGGBB; using {} instead", value, fallback);
+
+		return fallback;
 	}
 
-	/** Parses {@code #AARRGGBB}, falling back to {@code fallback} on anything malformed. */
+	/** Parses {@code #AARRGGBB} or {@code #RRGGBB}, falling back on anything malformed. */
 	private static int parseColor(String value, int fallback) {
+		long parsed = tryParseColor(value);
+
+		return parsed < 0L ? fallback : (int) parsed;
+	}
+
+	/**
+	 * The packed colour, or {@code -1} when {@code value} is not a colour at all.
+	 *
+	 * <p>{@code #RRGGBB} is the form people reach for, and reading six digits as {@code AARRGGBB}
+	 * hands them alpha 0 — an invisible hologram that reads as a broken mod rather than as a
+	 * missing pair of digits. So six digits means opaque, and any other length is rejected outright
+	 * instead of being truncated into something that happens to parse.
+	 */
+	private static long tryParseColor(String value) {
 		if (value == null) {
-			return fallback;
+			return -1L;
 		}
 
 		String hex = value.startsWith("#") ? value.substring(1) : value;
 
+		if (hex.length() != 6 && hex.length() != 8) {
+			return -1L;
+		}
+
 		try {
-			return (int) Long.parseLong(hex, 16);
+			long parsed = Integer.parseUnsignedInt(hex, 16) & 0xFFFFFFFFL;
+
+			return hex.length() == 6 ? parsed | 0xFF000000L : parsed;
 		} catch (NumberFormatException e) {
-			return fallback;
+			return -1L;
 		}
 	}
 }
