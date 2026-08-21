@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Unit tests**, in a new `src/test` source set on the fabric and paper modules. They cover the
+  pure arithmetic the client game tests can only reach slowly and indirectly, and run in about a
+  second with no game client: pyramid geometry, colour parsing, and the packed-position wire format
+  the Paper plugin decodes by hand. That last one is the case worth having — get a shift wrong and
+  the plugin silently builds somewhere else entirely, and nothing else in the project would notice,
+  so the expected values are golden values taken from vanilla's real `BlockPos.asLong()` rather
+  than re-derived from the same shifts under test.
+- One test pins the ordering `PlacementPlan.compute` depends on: it scans the largest pyramid once
+  and treats a smaller tier as the tail of that scan, which only holds while positions come out
+  widest layer first. Reordering them would otherwise build the wrong layers, silently.
+
+`build` already depends on `check`, so CI runs these with no workflow change.
+
 ## 1.1.0
 
 Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.

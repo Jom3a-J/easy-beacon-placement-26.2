@@ -29,6 +29,24 @@ subprojects {
 		it.options.compilerArgs << '-Xlint:deprecation'
 	}
 
+	// Plain JUnit tests for the parts that are pure functions. These are not a replacement for the
+	// client game tests in `fabric/src/gametest` - those drive a real client and are the only thing
+	// that can prove a block really lands in the world. These cover the arithmetic underneath, which
+	// the game tests can only reach slowly and indirectly, and they run in about a second.
+	//
+	// `build` depends on `check` depends on `test`, so CI picks these up with no workflow change.
+	dependencies {
+		testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+	}
+
+	tasks.named('test') {
+		useJUnitPlatform()
+		testLogging {
+			events 'passed', 'failed', 'skipped'
+		}
+	}
+
 	// The mod loaders compile the same shared sources out of ../common. The Paper plugin does not:
 	// it targets the Bukkit API rather than Minecraft's own classes, so it shares nothing but the
 	// wire format.

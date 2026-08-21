@@ -144,7 +144,15 @@ Requires **JDK 25**.
 
 Jars land in `fabric/build/libs/`, `neoforge/build/libs/` and `paper/build/libs/`.
 
-To run the end-to-end tests, which drive a real client and a real dedicated server:
+Unit tests cover the pure arithmetic — pyramid geometry, the packed-position wire format shared
+with the Paper plugin, and colour parsing. They need no game client and run in about a second, and
+`build` already depends on them:
+
+```bash
+./gradlew test
+```
+
+The end-to-end tests drive a real client and a real dedicated server, and take a couple of minutes:
 
 ```bash
 ./gradlew :fabric:runClientGameTest
