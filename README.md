@@ -1,96 +1,118 @@
-# Easy Beacon Placement
+![banner](https://cdn.modrinth.com/data/cached_images/a44b021902af1298e3a46b6c7a0b9785eef8bf82.png)
+Beacons are the most tedious block in the game to place. A tier-4 base is **164 blocks** in a
+stepped 9×9 pyramid, and you usually only discover something was in the way after you have started
+digging.
 
-See the beacon pyramid before you build it. Then build it in one click.
+This mod shows you the whole structure before you commit, then builds it for you.
 
-Hold a beacon, hold <kbd>Left Alt</kbd>, and the pyramid you are about to build appears as a
-colour-coded hologram — sized to the blocks you are actually carrying, with anything in the way
-picked out in red. Right-click to build the whole thing.
+## Hold a beacon. Hold a key. See it.
 
-![Ghost blocks of the real material, green when it will work](docs/media/1-ghost-blocks.png)
+The preview is sized automatically to the base blocks you are carrying — it works out the largest
+tier you can actually complete, and counts blocks you have already placed towards it, so a
+half-finished pyramid gets finished rather than restarted.
 
-**Minecraft 26.2** · Fabric · Quilt · NeoForge · Paper/Spigot
+Slots that will be filled are shown as a **translucent ghost of the real block**. A previewed iron
+block looks like iron.
 
----
+![sd](https://cdn.modrinth.com/data/cached_images/348f04a82826d6094b11a0b8a77ba0cd98078ca1.png)
 
-## What it does
+## It tells you what is in the way — through the ground
 
-**Shows you the real blocks.** The preview is a translucent ghost of the actual block that will be
-placed — your iron, your netherite — not abstract markers.
+The pyramid goes *below* the beacon, so aiming at flat terrain means digging. Everything blocking
+it is drawn **red and visible straight through solid blocks**, so you can see the exact volume you
+need to clear without breaking anything first.
 
-**Sizes itself to your inventory.** It picks the largest tier you can complete (9 / 34 / 83 / 164
-blocks for tiers 1–4). Blocks already correctly in place count towards it, so a half-built pyramid
-gets finished rather than rebuilt.
+![d](https://cdn.modrinth.com/data/cached_images/9cb320de52e56f245cee1cece18953aef4b351cc.png)
 
-**Shows obstructions through terrain.** Anything blocking the base is drawn in red and stays
-visible inside solid ground, because it is almost always buried and the point is to show you what
-to dig.
+## And whether it will actually work
 
-![Blockers shown through the ground](docs/media/2-obstructions.png)
+A tier-4 footprint is 9×9 and mostly behind you. You should not have to inspect it block by block,
+so the mod gives you a verdict instead:
 
-**Gives you a verdict, not a puzzle.** The beacon's own outline is green, amber or red for *will
-reach this tier* / *will only manage a lower one* / *won't work*. A tier-4 footprint is 9×9 and
-mostly off-screen — you should not have to inspect it by eye.
+| | |
+|---|---|
+| 🟢 **Green** | will reach the tier shown |
+| 🟡 **Amber** | will only manage a lower tier |
+| 🔴 **Red** | will not work at all |
 
-**Builds in one click**, verifying each placement against the world and retrying rather than firing
-and forgetting.
+The status line spells it out — *"Tier 4 blocked — you'll only get Tier 2"* — because a beacon's
+tier is capped by the first incomplete layer counting up from the bottom.
 
-![One click, placed and verified block by block](docs/media/3-build.gif)
+## Then one click
 
-**Modded base blocks work automatically** via the `#minecraft:beacon_base_blocks` block tag. The mod
-knows nothing about specific blocks.
+Blocks are placed for you, **verified against the world, and retried** if the server rejects one,
+so you do not end up with holes in the base.
+
+![c](https://cdn.modrinth.com/data/cached_images/d7fe42bfe543fb549d74abe4d9b9859caa859c3c.gif)
+
+![f](https://cdn.modrinth.com/data/cached_images/f1d23f4629658c57e9d01cdeac9e2e24afb47056.png)
+
+## Position it exactly
+
+- **Mouse wheel** — push the preview along your line of sight
+- **Sneak + wheel** — move it straight up and down
+- Works aiming at open sky, not just at a block
+
+![d](https://cdn.modrinth.com/data/cached_images/107a5ebe89a280675240e00638a1c62a5b292b94.gif)
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| <kbd>Left Alt</kbd> (hold) | Show the hologram |
-| Right-click | Build the previewed pyramid |
-| <kbd>V</kbd> | Cycle the tier (auto → 1 → 2 → 3 → 4 → auto); cancels an in-progress build |
-| Mouse wheel | Push the beacon along your line of sight |
-| Sneak + wheel | Move the beacon up and down |
+| Action | Default |
+|---|---|
+| Show the hologram (hold) | `Left Alt` |
+| Move nearer / further | Mouse wheel |
+| Move up / down | Sneak + wheel |
+| Cycle tier / cancel a build | `V` |
+| Build it | Right-click while the hologram is shown |
 
-Both keys are rebindable in Options → Controls, under *Easy Beacon Placement*.
-
-The wheel works when you are aiming at open sky too, not just at a block — so you can place a beacon
-in mid-air and let the pyramid fill in below it.
-
-![Mouse wheel positioning](docs/media/5-scroll.gif)
+All rebindable. Any block in the `#minecraft:beacon_base_blocks` tag works, so **modded base blocks
+are supported automatically**.
 
 ## Installing
 
-**The client half is the one you need.** Drop the jar for your loader into `mods/` along with
-[Fabric API](https://modrinth.com/mod/fabric-api) on Fabric or Quilt. That is the whole setup, and
-it works against vanilla, Paper, Spigot, Purpur and Folia servers with nothing installed on them.
+You only need the **client** file. Installing on a server is optional and does exactly one thing:
+removes the reach limit.
 
-**Installing server-side is optional and only removes the reach limit.** Without it the client
-places every block through the ordinary vanilla interaction packet, so the server's own reach limit
-applies and large pyramids need you to walk around. With it, the server places the structure
-directly and that limit disappears. Singleplayer gets this automatically.
+| Your setup | File | Also needs |
+|---|---|---|
+| Fabric / Quilt | `easy_beacon_placement-fabric-*.jar` → `mods/` | **Fabric API** |
+| NeoForge | `easy_beacon_placement-neoforge-*.jar` → `mods/` | nothing |
+| Paper / Spigot server | `easy_beacon_placement-paper-*.jar` → `plugins/` | nothing |
 
-| Server | What to install |
-| --- | --- |
-| Fabric / Quilt | the same `-fabric` jar, in the server's `mods/` |
-| NeoForge | the same `-neoforge` jar, in the server's `mods/` |
-| Paper / Spigot | the `-paper` jar, in `plugins/` |
+Mismatched setups are fine in both directions — a client with the mod can join a server without it,
+and vice versa. Nothing is registered as required, so nobody gets kicked.
 
-Server-side placement grants nothing you could not do by hand. The beacon must still be in your
-hand, blocks are still consumed from your inventory, and world height, world border, chunk loading
-and spawn protection are all enforced. On Paper and NeoForge each block is offered to the server's
-own block-place event, so WorldGuard, GriefPrevention and similar can veto individual positions —
-anything refused is refunded.
+## About reach
 
-> [!NOTE]
-> This is an auto-build mod, the same category as Litematica's printer or building wands. Some
+With nothing installed server-side, blocks are placed through the same call vanilla makes when you
+right-click. The server cannot tell the difference, which is why this works on **vanilla, Paper,
+Spigot, Purpur and Folia untouched** — but the server's own reach limit (4.5 blocks) then applies,
+so large pyramids need you to walk around. Out-of-reach blocks stay queued and you are told about
+them rather than losing them. Only what is in a hand can be placed this way — your hotbar and your
+offhand — so the preview sizes itself to those, and shows you the pyramid you can actually finish
+from where you are standing.
+
+Install the mod or the Paper plugin server-side and that limit disappears: the server places the
+structure directly.
+
+It grants nothing you could not already do by hand. The beacon must still be in your hand, blocks
+are still consumed from your inventory, and world border, world height, chunk loading and spawn
+protection are all enforced. On Paper and NeoForge every block is offered to the server's own
+block-place event, so **WorldGuard, GriefPrevention and similar can veto individual blocks** —
+anything refused is refunded. (Fabric API has no block-place event to fire, so there is nothing
+standard to offer a placement to there.)
+
+> ⚠️ This is an auto-build mod, the same category as Litematica's printer or building wands. Some
 > servers forbid client-side automation regardless of how ordinary the packets look. Check your
 > server's rules.
 
 ## Configuration
 
-Written to `config/easy_beacon_placement.json` on first launch. Colours are `#AARRGGBB`, or
-`#RRGGBB` for fully opaque.
+Written to `config/easy_beacon_placement.json` on first launch. Everything is optional — the
+defaults are the intended experience. Colours are `#AARRGGBB`, or `#RRGGBB` for fully opaque.
 
 | Option | Default | What it does |
-| --- | --- | --- |
+|---|---|---|
 | `maxInFlight` | `4` | Placements awaiting server confirmation at once. `1` builds strictly one block at a time. Keep it small — a large backlog of unacknowledged predictions is what leaves holes. |
 | `preferServerPlacement` | `true` | Let the server build when it has the mod. Turn off to always place client-side, exactly as players without it experience. |
 | `maxTier` | `4` | Upper bound on the previewed tier (1–4). |
@@ -109,7 +131,7 @@ Written to `config/easy_beacon_placement.json` on first launch. Colours are `#AA
 | `colorMissingMaterial` | `#40FFC53D` | Free space, but you are out of blocks. |
 
 Out-of-range values are clamped and malformed colours are reported in the log and replaced, both
-written back to the file. The file is also rewritten on load, so upgrading picks up new options
+written back to the file. The file is rewritten on load, so upgrading picks up newly added options
 rather than leaving you to find them in the changelog.
 
 ## Building from source
@@ -141,11 +163,6 @@ The Paper plugin shares nothing with the mod. Paper is not a mod loader — it i
 vanilla server exposing the Bukkit API — so it cannot see Minecraft's own classes. The only thing
 the two sides share is the shape of the packet, pinned down in `PyramidGeometry`.
 
-## Links
+See the [changelog](CHANGELOG.md) for what has changed between versions.
 
-- [Changelog](CHANGELOG.md)
-- [Modrinth page copy](docs/modrinth-description.md)
-
-## License
-
-[MIT](LICENSE).
+MIT licensed. By **Jom3a**.
