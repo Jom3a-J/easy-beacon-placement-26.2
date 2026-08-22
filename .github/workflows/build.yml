@@ -25,6 +25,11 @@ jobs:
         # The gametest source set is not wired into `check`, so it has to be named explicitly or
         # a test that no longer compiles goes unnoticed until someone runs it locally.
         run: ./gradlew build :fabric:compileGametestJava
+      - name: neoforge harness
+        # A headless dedicated server that drives the real server-side builder with a FakePlayer,
+        # including the block-place event that land-claim mods hook. It needs no display and takes
+        # well under a minute, so it belongs in CI rather than in someone's memory.
+        run: ./gradlew :neoforge:runHarness
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:

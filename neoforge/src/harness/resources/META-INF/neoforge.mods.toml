@@ -1,0 +1,19 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "ebp_harness"
+version = "1.0.0"
+displayName = "Easy Beacon Placement Harness"
+description = '''
+Automated tests for the NeoForge half of Easy Beacon Placement. Loaded only by the `runHarness`
+run configuration; it is never part of the published jar.
+'''
+
+[[dependencies.ebp_harness]]
+modId = "easy_beacon_placement"
+type = "required"
+versionRange = "[1,)"
+ordering = "AFTER"
+side = "BOTH"

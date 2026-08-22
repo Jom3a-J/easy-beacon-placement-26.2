@@ -31,6 +31,7 @@ bin/
 # fabric
 
 run/
+run-harness/
 
 # log4j opens this the moment a JVM with the Minecraft classpath starts,
 # including the unit tests, which otherwise leave an empty file behind.
