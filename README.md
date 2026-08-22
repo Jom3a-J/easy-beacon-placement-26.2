@@ -153,23 +153,26 @@ with the Paper plugin, and colour parsing. They need no game client and run in a
 ./gradlew test
 ```
 
-Each loader also has an end-to-end harness. All three are unattended — no display, no clicking:
+Each loader also has an end-to-end harness. The headless ones run together in a couple of minutes:
+
+```bash
+./gradlew localCheck
+```
+
+That is the unit tests plus the NeoForge harness — a headless server driving the builder with a
+`FakePlayer` — and the Paper one, which downloads a Paper server, verifies its published SHA-256,
+and runs a harness plugin against it.
+
+These are deliberately **not** in CI: booting real servers, and downloading one, is a lot of time to
+spend on every push. CI runs the unit tests and compiles every source set, so a harness cannot
+quietly stop compiling; actually running them is a local step before a change goes out.
+
+The Fabric game tests are separate again, because they drive a real game client and so need a
+display:
 
 ```bash
 ./gradlew :fabric:runClientGameTest
 ```
-
-```bash
-./gradlew :neoforge:runHarness
-```
-
-```bash
-./gradlew :paper:runHarness
-```
-
-The Fabric one drives a real client and a real dedicated server. The NeoForge one boots a headless
-server and drives the builder with a `FakePlayer`. The Paper one downloads a Paper server, checks
-its published SHA-256, and runs a harness plugin against it. All three run in CI.
 
 ### Project layout
 

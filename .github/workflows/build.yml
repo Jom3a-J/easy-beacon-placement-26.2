@@ -22,19 +22,17 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
-        # The gametest source set is not wired into `check`, so it has to be named explicitly or
-        # a test that no longer compiles goes unnoticed until someone runs it locally.
-        run: ./gradlew build :fabric:compileGametestJava
-      - name: neoforge harness
-        # A headless dedicated server that drives the real server-side builder with a FakePlayer,
-        # including the block-place event that land-claim mods hook. It needs no display and takes
-        # well under a minute, so it belongs in CI rather than in someone's memory.
-        run: ./gradlew :neoforge:runHarness
-      - name: paper harness
-        # The same idea for the plugin, against a real Paper server this downloads and checksums.
-        # Running against current stable rather than a pinned build is deliberate: it is how
-        # Paper-side breakage shows up here first rather than in someone's server console.
-        run: ./gradlew :paper:runHarness
+        # The unit tests run here, via `check`. The loader harnesses deliberately do not: they boot
+        # real servers, and the Paper one downloads a server to do it, which is a lot of CI time
+        # per push. They are run locally instead - see `./gradlew localCheck`.
+        #
+        # Their source sets are still compiled, because none of them is wired into `check` and a
+        # harness that quietly stopped compiling would not be noticed until someone went to use it.
+        run: >-
+          ./gradlew build
+          :fabric:compileGametestJava
+          :neoforge:compileHarnessJava
+          :paper:compileHarnessJava
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -61,3 +61,22 @@ subprojects {
 		}
 	}
 }
+
+/**
+ * Everything that can be checked on this machine, in one command.
+ *
+ * <p>CI runs the unit tests and compiles every source set, but not the loader harnesses: those boot
+ * real servers, and the Paper one downloads a server to do it, which is a lot of time to spend on
+ * every push. They live here instead — a couple of minutes locally, before a change goes out.
+ *
+ * <p>The Fabric client game tests are not included: they drive a real game client, so they need a
+ * display and cannot run alongside the headless ones unattended. Run them with
+ * {@code ./gradlew :fabric:runClientGameTest} when a change touches rendering or client input.
+ */
+tasks.register('localCheck') {
+	group = 'verification'
+	description = 'Unit tests plus the NeoForge and Paper harnesses. Everything but the client game tests.'
+
+	dependsOn ':fabric:test', ':paper:test'
+	dependsOn ':neoforge:runHarness', ':paper:runHarness'
+}

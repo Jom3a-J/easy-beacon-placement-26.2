@@ -16,8 +16,11 @@
 - Both prove the veto path the docs promise: a refused build leaves nothing behind and refunds
   every block, and refusing a single position loses only that one — the per-block behaviour chosen
   over an all-or-nothing multi-place event, now demonstrated rather than argued.
-- Both run in CI, and both were verified by mutation: deleting the refund fails exactly the refund
-  checks and nothing else.
+- `./gradlew localCheck` runs the unit tests and both harnesses together, in about two minutes.
+- Both were verified by mutation: deleting the refund fails exactly the refund checks and nothing
+  else. They are run locally rather than in CI — booting real servers, and downloading one, is a
+  lot of time to spend on every push. CI still compiles every source set, so a harness cannot
+  quietly stop compiling between uses.
 
 ## 1.1.0
 
