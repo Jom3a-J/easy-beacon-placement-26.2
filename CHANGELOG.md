@@ -1,44 +1,9 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- **Unit tests**, in a new `src/test` source set on the fabric and paper modules. They cover the
-  pure arithmetic the client game tests can only reach slowly and indirectly, and run in about a
-  second with no game client: pyramid geometry, colour parsing, and the packed-position wire format
-  the Paper plugin decodes by hand. That last one is the case worth having — get a shift wrong and
-  the plugin silently builds somewhere else entirely, and nothing else in the project would notice,
-  so the expected values are golden values taken from vanilla's real `BlockPos.asLong()` rather
-  than re-derived from the same shifts under test.
-- One test pins the ordering `PlacementPlan.compute` depends on: it scans the largest pyramid once
-  and treats a smaller tier as the tail of that scan, which only holds while positions come out
-  widest layer first. Reordering them would otherwise build the wrong layers, silently.
-- **`PlacementPlan.compute` is now testable**, and tested. It takes the terrain question as a
-  `TerrainReader` rather than reaching for block tags itself, which is what previously forced any
-  test of the planning arithmetic to boot most of the game. Seventeen tests now cover tier
-  selection, the material budget, and the effective-tier rules — the cases the client game tests
-  cannot cheaply reach, since those run with a creative inventory against terrain that is either
-  wholly free or wholly obstructed. Behaviour is unchanged; the live path hands in a reader that
-  reads the world.
-
-### Fixed
-
-- The claim that a beacon's tier is capped by the first incomplete layer *counting up from the
-  bottom* had it backwards, and had been copied into four places: `PlacementPlan`, the game test,
-  the README and the Modrinth page copy — the last two player-facing. Layers are numbered
-  downwards from the beacon, so the blocked layer **nearest the beacon** caps the result: losing the
-  bottom layer of a tier-4 pyramid still leaves a working tier 3, while losing the 3x3 directly
-  underneath leaves nothing at all. The code was always right and is unchanged; the comment was
-  wrong in the direction that invites someone to "fix" working code, and it is what sent four of
-  these new tests down the wrong path before they were corrected against real in-game behaviour.
-  The player-facing copies now say a beacon counts only the complete layers directly beneath it.
-
-`build` already depends on `check`, so CI runs these with no workflow change.
-
 ## 1.1.0
 
-Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.
+Minecraft 26.2. Fixes, a large performance pass, protection-mod support on NeoForge, and a
+unit-test suite for the parts that had none.
 
 ### Fixed
 
@@ -70,6 +35,15 @@ Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on N
   to reach the far side takes longer than that, so walking to the rest of your own pyramid could
   end the build. Moving now counts as progress and only a player who has actually stopped is given
   up on, with a twenty-second ceiling so a build cannot follow someone who has wandered off.
+- The claim that a beacon's tier is capped by the first incomplete layer *counting up from the
+  bottom* had it backwards, and had been copied into four places: `PlacementPlan`, the game test,
+  the README and the Modrinth page copy — the last two player-facing. Layers are numbered
+  downwards from the beacon, so the blocked layer **nearest the beacon** caps the result: losing the
+  bottom layer of a tier-4 pyramid still leaves a working tier 3, while losing the 3x3 directly
+  underneath leaves nothing at all. The code was always right and is unchanged; the comment was
+  wrong in the direction that invites someone to "fix" working code, and it is what sent four of
+  these new tests down the wrong path before they were corrected against real in-game behaviour.
+  The player-facing copies now say a beacon counts only the complete layers directly beneath it.
 
 ### Changed
 
@@ -99,6 +73,26 @@ Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on N
   `doWeatherCycle`, `doMobSpawning`, now `advance_time`, `advance_weather` and `spawn_mobs`). They
   failed as unknown arguments, and `/gamerule` reports that to chat rather than to the test, so the
   arena had quietly kept its day cycle and its mob spawning the whole time.
+- **Unit tests**, in a new `src/test` source set on the fabric and paper modules. They cover the
+  pure arithmetic the client game tests can only reach slowly and indirectly, and run in about a
+  second with no game client: pyramid geometry, colour parsing, and the packed-position wire format
+  the Paper plugin decodes by hand. That last one is the case worth having — get a shift wrong and
+  the plugin silently builds somewhere else entirely, and nothing else in the project would notice,
+  so the expected values are golden values taken from vanilla's real `BlockPos.asLong()` rather
+  than re-derived from the same shifts under test.
+- One test pins the ordering `PlacementPlan.compute` depends on: it scans the largest pyramid once
+  and treats a smaller tier as the tail of that scan, which only holds while positions come out
+  widest layer first. Reordering them would otherwise build the wrong layers, silently.
+- **`PlacementPlan.compute` is now testable**, and tested. It takes the terrain question as a
+  `TerrainReader` rather than reaching for block tags itself, which is what previously forced any
+  test of the planning arithmetic to boot most of the game. Seventeen tests now cover tier
+  selection, the material budget, and the effective-tier rules — the cases the client game tests
+  cannot cheaply reach, since those run with a creative inventory against terrain that is either
+  wholly free or wholly obstructed. Behaviour is unchanged; the live path hands in a reader that
+  reads the world.
+
+`build` depends on `check`, so the unit tests run in CI with no workflow change; the client
+game tests still need `./gradlew :fabric:runClientGameTest` and a display.
 
 ### Performance
 
