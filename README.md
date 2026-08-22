@@ -145,34 +145,22 @@ Requires **JDK 25**.
 
 Jars land in `fabric/build/libs/`, `neoforge/build/libs/` and `paper/build/libs/`.
 
-Unit tests cover the pure arithmetic — pyramid geometry, the packed-position wire format shared
-with the Paper plugin, and colour parsing. They need no game client and run in about a second, and
-`build` already depends on them:
+### Testing
 
-```bash
-./gradlew test
-```
+The test scaffolding is not in this repository. It is kept alongside the source on the machines
+that run it, and covers three levels:
 
-Each loader also has an end-to-end harness. The headless ones run together in a couple of minutes:
+- **Unit tests** over the pure arithmetic — pyramid geometry, the packed-position wire format the
+  Paper plugin decodes by hand, and colour parsing. About a second, no game involved.
+- **A harness per loader**, each booting a real server and driving the real server-side builder.
+  NeoForge's uses its `FakePlayer`; Paper's downloads a Paper server, verifies its published
+  SHA-256, and runs a second plugin against it. Between them they cover the block-place event that
+  land-claim mods hook, including that a refused build is rolled back and every block refunded.
+- **Fabric client game tests**, which drive a real client and a real dedicated server — the only
+  level that can prove the hologram renders and that a click really puts blocks in the world.
 
-```bash
-./gradlew localCheck
-```
-
-That is the unit tests plus the NeoForge harness — a headless server driving the builder with a
-`FakePlayer` — and the Paper one, which downloads a Paper server, verifies its published SHA-256,
-and runs a harness plugin against it.
-
-These are deliberately **not** in CI: booting real servers, and downloading one, is a lot of time to
-spend on every push. CI runs the unit tests and compiles every source set, so a harness cannot
-quietly stop compiling; actually running them is a local step before a change goes out.
-
-The Fabric game tests are separate again, because they drive a real game client and so need a
-display:
-
-```bash
-./gradlew :fabric:runClientGameTest
-```
+They run before a release rather than on every push, which is why the build here is just
+`./gradlew build`.
 
 ### Project layout
 
