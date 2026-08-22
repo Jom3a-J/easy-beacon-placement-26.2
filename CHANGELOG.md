@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Every loader can now be tested without a person at the keyboard.** Fabric already had client
+  game tests; NeoForge and Paper had nothing, so their own wiring was only ever compiled — and the
+  block-place event both offer to land-claim mods had never once fired.
+  - `./gradlew :neoforge:runHarness` boots a headless dedicated server and drives the real builder
+    with NeoForge's `FakePlayer`, which extends `ServerPlayer`, so the code under test cannot tell
+    the difference. 16 checks.
+  - `./gradlew :paper:runHarness` downloads a Paper server, verifies its published checksum, and
+    runs a harness plugin against it. Bukkit has no `FakePlayer`, so the player is a proxy backed
+    by real state — the world, blocks, events and plugin logic all stay real. 18 checks.
+- Both prove the veto path the docs promise: a refused build leaves nothing behind and refunds
+  every block, and refusing a single position loses only that one — the per-block behaviour chosen
+  over an all-or-nothing multi-place event, now demonstrated rather than argued.
+- Both run in CI, and both were verified by mutation: deleting the refund fails exactly the refund
+  checks and nothing else.
+
 ## 1.1.0
 
 Minecraft 26.2. Fixes, a large performance pass, protection-mod support on NeoForge, and a

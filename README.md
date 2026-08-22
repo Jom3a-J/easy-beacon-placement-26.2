@@ -153,11 +153,23 @@ with the Paper plugin, and colour parsing. They need no game client and run in a
 ./gradlew test
 ```
 
-The end-to-end tests drive a real client and a real dedicated server, and take a couple of minutes:
+Each loader also has an end-to-end harness. All three are unattended — no display, no clicking:
 
 ```bash
 ./gradlew :fabric:runClientGameTest
 ```
+
+```bash
+./gradlew :neoforge:runHarness
+```
+
+```bash
+./gradlew :paper:runHarness
+```
+
+The Fabric one drives a real client and a real dedicated server. The NeoForge one boots a headless
+server and drives the builder with a `FakePlayer`. The Paper one downloads a Paper server, checks
+its published SHA-256, and runs a harness plugin against it. All three run in CI.
 
 ### Project layout
 
