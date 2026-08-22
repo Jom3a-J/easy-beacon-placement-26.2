@@ -2,40 +2,14 @@ plugins {
 	id 'net.neoforged.moddev'
 }
 
-// A second source set holding the automated harness. It is a mod in its own right, loaded only by
-// the `runHarness` run below, so nothing in it can reach the published jar. This mirrors what
-// `fabric/src/gametest` does for the other loader.
-sourceSets {
-	harness {
-		compileClasspath += sourceSets.main.output
-		runtimeClasspath += sourceSets.main.output
-	}
-}
-
-configurations {
-	harnessCompileOnly.extendsFrom compileOnly
-	harnessImplementation.extendsFrom implementation
-	harnessRuntimeOnly.extendsFrom runtimeOnly
-}
-
 neoForge {
 	version = rootProject.neoforge_version
 
-	// The harness compiles against Minecraft and NeoForge like any mod source set does; without
-	// this it only inherits the plain `java` classpath and cannot see either.
-	addModdingDependenciesTo sourceSets.harness
-
-	// Declared before `runs`, because the harness run names both of these and the container has to
-	// be populated by the time that reference is resolved.
 	mods {
 		// Registered by literal name: a GString key here silently fails to create the mod entry,
 		// and the dev run then treats the raw classes directory as a mod file and refuses to start.
 		create('easy_beacon_placement') {
 			sourceSet sourceSets.main
-		}
-
-		create('ebp_harness') {
-			sourceSet sourceSets.harness
 		}
 	}
 
@@ -44,44 +18,7 @@ neoForge {
 			client()
 			loadedMods = [mods.getByName('easy_beacon_placement')]
 		}
-
-		// Headless dedicated server that runs the harness and exits non-zero on failure, so it
-		// works unattended and in CI. NeoForge does ship a `gameTestServer` run type, but 26.x
-		// moved game tests to a data-driven registry of structure templates - a lot of scaffolding
-		// for tests that need no structure. Driving a real server directly is simpler and lets the
-		// harness own its own exit code.
-		harness {
-			server()
-			gameDirectory = file('run-harness')
-			programArgument '--nogui'
-			loadedMods = [mods.getByName('easy_beacon_placement'), mods.getByName('ebp_harness')]
-		}
 	}
-}
-
-// A dedicated server refuses to boot without this. The harness world is a throwaway under
-// `run-harness/`, created and discarded by the run itself.
-def acceptHarnessEula = tasks.register('acceptHarnessEula') {
-	def dir = file('run-harness')
-	outputs.file(new File(dir, 'eula.txt'))
-
-	doLast {
-		dir.mkdirs()
-		new File(dir, 'eula.txt').text = 'eula=true\n'
-		new File(dir, 'server.properties').text = [
-			'level-type=minecraft\\:flat',
-			'online-mode=false',
-			'max-players=1',
-			'view-distance=6',
-			'allow-nether=false',
-			'spawn-protection=0',
-			'sync-chunk-writes=false'
-		].join('\n') + '\n'
-	}
-}
-
-tasks.named('runHarness') {
-	dependsOn acceptHarnessEula
 }
 
 processResources {
@@ -97,4 +34,10 @@ processResources {
 	filesMatching('META-INF/neoforge.mods.toml') {
 		expand props
 	}
+}
+
+// Test scaffolding is kept out of this repository, which ships the mod. When it is present on a
+// machine it brings its own build wiring with it; when it is not, this is a no-op.
+if (file('harness.gradle').exists()) {
+	apply from: 'harness.gradle'
 }

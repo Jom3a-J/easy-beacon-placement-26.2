@@ -22,17 +22,10 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
-        # The unit tests run here, via `check`. The loader harnesses deliberately do not: they boot
-        # real servers, and the Paper one downloads a server to do it, which is a lot of CI time
-        # per push. They are run locally instead - see `./gradlew localCheck`.
-        #
-        # Their source sets are still compiled, because none of them is wired into `check` and a
-        # harness that quietly stopped compiling would not be noticed until someone went to use it.
-        run: >-
-          ./gradlew build
-          :fabric:compileGametestJava
-          :neoforge:compileHarnessJava
-          :paper:compileHarnessJava
+        # This repository holds the mod itself. The test scaffolding - unit tests, the client game
+        # tests, and the per-loader harnesses - lives outside it and is run locally before a
+        # release, so there is nothing here for CI to run beyond the build.
+        run: ./gradlew build
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:

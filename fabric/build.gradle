@@ -9,21 +9,6 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 }
 
-// Creates the `gametest` source set and the `runClientGameTest` task. The tests drive a real
-// client, so they cover the parts unit tests cannot: that the hologram actually renders, and
-// that placement really puts blocks in the world.
-fabricApi {
-	configureTests {
-		createSourceSet = true
-		modId = "easy_beacon_placement_gametest"
-		enableGameTests = false
-		enableClientGameTests = true
-		// Needed for the dedicated-server test, which starts a real server process locally.
-		// Accepted by the project owner: https://www.minecraft.net/eula
-		eula = true
-	}
-}
-
 processResources {
 	def props = [
 		version    : project.version,
@@ -37,4 +22,10 @@ processResources {
 	filesMatching('fabric.mod.json') {
 		expand props
 	}
+}
+
+// Test scaffolding is kept out of this repository, which ships the mod. When it is present on a
+// machine it brings its own build wiring with it; when it is not, this is a no-op.
+if (file('harness.gradle').exists()) {
+	apply from: 'harness.gradle'
 }

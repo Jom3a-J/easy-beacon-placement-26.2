@@ -43,3 +43,16 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+# tests
+#
+# This repository holds the mod. The test scaffolding - unit tests, the Fabric client game tests,
+# and the per-loader harnesses - is kept alongside it on the machines that run it, not shipped with
+# the source. Each piece carries its own build wiring, and the tracked build files do nothing at all
+# when it is absent.
+
+local-tests.gradle
+**/harness.gradle
+**/src/test/
+**/src/gametest/
+**/src/harness/

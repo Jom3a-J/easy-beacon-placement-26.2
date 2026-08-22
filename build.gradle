@@ -29,24 +29,6 @@ subprojects {
 		it.options.compilerArgs << '-Xlint:deprecation'
 	}
 
-	// Plain JUnit tests for the parts that are pure functions. These are not a replacement for the
-	// client game tests in `fabric/src/gametest` - those drive a real client and are the only thing
-	// that can prove a block really lands in the world. These cover the arithmetic underneath, which
-	// the game tests can only reach slowly and indirectly, and they run in about a second.
-	//
-	// `build` depends on `check` depends on `test`, so CI picks these up with no workflow change.
-	dependencies {
-		testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
-		testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
-	}
-
-	tasks.named('test') {
-		useJUnitPlatform()
-		testLogging {
-			events 'passed', 'failed', 'skipped'
-		}
-	}
-
 	// The mod loaders compile the same shared sources out of ../common. The Paper plugin does not:
 	// it targets the Bukkit API rather than Minecraft's own classes, so it shares nothing but the
 	// wire format.
@@ -62,21 +44,9 @@ subprojects {
 	}
 }
 
-/**
- * Everything that can be checked on this machine, in one command.
- *
- * <p>CI runs the unit tests and compiles every source set, but not the loader harnesses: those boot
- * real servers, and the Paper one downloads a server to do it, which is a lot of time to spend on
- * every push. They live here instead — a couple of minutes locally, before a change goes out.
- *
- * <p>The Fabric client game tests are not included: they drive a real game client, so they need a
- * display and cannot run alongside the headless ones unattended. Run them with
- * {@code ./gradlew :fabric:runClientGameTest} when a change touches rendering or client input.
- */
-tasks.register('localCheck') {
-	group = 'verification'
-	description = 'Unit tests plus the NeoForge and Paper harnesses. Everything but the client game tests.'
-
-	dependsOn ':fabric:test', ':paper:test'
-	dependsOn ':neoforge:runHarness', ':paper:runHarness'
+// Tests are kept out of this repository, which ships the mod itself. When the test scaffolding is
+// present on a machine it brings its own build wiring with it, and when it is not, nothing here
+// refers to something that does not exist.
+if (file('local-tests.gradle').exists()) {
+	apply from: 'local-tests.gradle'
 }
