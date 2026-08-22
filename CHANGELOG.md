@@ -24,13 +24,15 @@
 
 ### Fixed
 
-- A comment claiming a beacon's tier is capped by the first incomplete layer *counting up from the
-  bottom* had it backwards, in both `PlacementPlan` and the game test. Layers are numbered downwards
-  from the beacon, so it is the blocked layer **nearest the beacon** that caps the result: losing the
+- The claim that a beacon's tier is capped by the first incomplete layer *counting up from the
+  bottom* had it backwards, and had been copied into four places: `PlacementPlan`, the game test,
+  the README and the Modrinth page copy — the last two player-facing. Layers are numbered
+  downwards from the beacon, so the blocked layer **nearest the beacon** caps the result: losing the
   bottom layer of a tier-4 pyramid still leaves a working tier 3, while losing the 3x3 directly
   underneath leaves nothing at all. The code was always right and is unchanged; the comment was
   wrong in the direction that invites someone to "fix" working code, and it is what sent four of
   these new tests down the wrong path before they were corrected against real in-game behaviour.
+  The player-facing copies now say a beacon counts only the complete layers directly beneath it.
 
 `build` already depends on `check`, so CI runs these with no workflow change.
 

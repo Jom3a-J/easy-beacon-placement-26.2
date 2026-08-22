@@ -35,8 +35,9 @@ so the mod gives you a verdict instead:
 | 🟡 **Amber** | will only manage a lower tier |
 | 🔴 **Red** | will not work at all |
 
-The status line spells it out — *"Tier 4 blocked — you'll only get Tier 2"* — because a beacon's
-tier is capped by the first incomplete layer counting up from the bottom.
+The status line spells it out — *"Tier 4 blocked — you'll only get Tier 2"* — because a beacon only
+counts the complete layers directly beneath it. One gap near the top caps everything, however
+perfect the wider layers underneath are.
 
 ## Then one click
 

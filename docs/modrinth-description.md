@@ -1,7 +1,8 @@
 # Modrinth page copy
 
-Everything below is ready to paste. Nothing here invents a URL: the five image slots are marked
-`PASTE_URL_1` … `PASTE_URL_5` and the two link lines are marked `TODO`.
+Everything below is ready to paste as it stands. The five image URLs point at the copies already
+uploaded to Modrinth’s CDN — the same ones the README renders — so nothing needs filling in
+first.
 
 ---
 
@@ -15,9 +16,8 @@ Everything below is ready to paste. Nothing here invents a URL: the five image s
 
 Copy everything between the rules.
 
-The five `![...](PASTE_URL_...)` lines are the image slots, already sitting next to the text
-they illustrate. They will render as broken images until you replace each `PASTE_URL_*` with a
-real URL — see [Filling in the image URLs](#filling-in-the-image-urls) below.
+The five images are already linked, each sitting next to the text it illustrates. If you ever
+re-upload one, swap its URL here too — see [Replacing an image](#replacing-an-image) below.
 
 ---
 
@@ -36,7 +36,7 @@ half-finished pyramid gets finished rather than restarted.
 Slots that will be filled are shown as a **translucent ghost of the real block**. A previewed iron
 block looks like iron.
 
-![Ghost blocks of the real material, green when it will work](PASTE_URL_1)
+![Ghost blocks of the real material, green when it will work](https://cdn.modrinth.com/data/cached_images/348f04a82826d6094b11a0b8a77ba0cd98078ca1.png)
 
 ## It tells you what is in the way — through the ground
 
@@ -44,7 +44,7 @@ The pyramid goes *below* the beacon, so aiming at flat terrain means digging. Ev
 it is drawn **red and visible straight through solid blocks**, so you can see the exact volume you
 need to clear without breaking anything first.
 
-![Blockers shown through the ground](PASTE_URL_2)
+![Blockers shown through the ground](https://cdn.modrinth.com/data/cached_images/9cb320de52e56f245cee1cece18953aef4b351cc.png)
 
 ## And whether it will actually work
 
@@ -57,17 +57,18 @@ so the mod gives you a verdict instead:
 | 🟡 **Amber** | will only manage a lower tier |
 | 🔴 **Red** | will not work at all |
 
-The status line spells it out — *"Tier 4 blocked — you'll only get Tier 2"* — because a beacon's
-tier is capped by the first incomplete layer counting up from the bottom.
+The status line spells it out — *"Tier 4 blocked — you'll only get Tier 2"* — because a beacon only
+counts the complete layers directly beneath it. One gap near the top caps everything, however
+perfect the wider layers underneath are.
 
 ## Then one click
 
 Blocks are placed for you, **verified against the world, and retried** if the server rejects one,
 so you do not end up with holes in the base.
 
-![One click, placed and verified block by block](PASTE_URL_3)
+![One click, placed and verified block by block](https://cdn.modrinth.com/data/cached_images/d7fe42bfe543fb549d74abe4d9b9859caa859c3c.gif)
 
-![Finished beacon](PASTE_URL_4)
+![Finished beacon](https://cdn.modrinth.com/data/cached_images/f1d23f4629658c57e9d01cdeac9e2e24afb47056.png)
 
 ## Position it exactly
 
@@ -75,7 +76,7 @@ so you do not end up with holes in the base.
 - **Sneak + wheel** — move it straight up and down
 - Works aiming at open sky, not just at a block
 
-![Mouse wheel positioning](PASTE_URL_5)
+![Mouse wheel positioning](https://cdn.modrinth.com/data/cached_images/107a5ebe89a280675240e00638a1c62a5b292b94.gif)
 
 ## Controls
 
@@ -130,8 +131,8 @@ standard to offer it to there.)
 
 ## Links
 
-- Source: TODO — your repository URL
-- Issues: TODO — your issue tracker URL
+- Source: https://github.com/Jom3a-J/easy-beacon-placement-26.2
+- Issues: https://github.com/Jom3a-J/easy-beacon-placement-26.2/issues
 
 MIT licensed. By **Jom3a**.
 
@@ -152,12 +153,11 @@ Paper servers will assume they cannot use it, when in fact the client half works
 
 ## Screenshots
 
-Do this **first** — the description above will not render correctly until the URLs exist.
+The five images are already uploaded and linked in the description above, so this section is a
+record of what came from where rather than a task list.
 
-Upload all five to the Modrinth **gallery**. That serves two purposes at once: the gallery is its
-own carousel on the page, *and* it hosts the files, giving you the CDN URLs the description needs.
-Modrinth has no upload button inside the description editor, so there is no other way to get an
-image in there short of hosting it yourself.
+They still want uploading to the Modrinth **gallery** as well, which serves a second purpose: the
+gallery is its own carousel on the page, separate from the images embedded in the description.
 
 The files in `docs/media/` are named in upload order, so sort the folder by name and work down it.
 
@@ -176,20 +176,20 @@ Set image **1** as the **featured** image — it shows the ghost blocks and the 
 which is the clearest single frame of what the mod does. Featured is what appears on search
 results and in Discord embeds.
 
-### Filling in the image URLs
+### Replacing an image
 
-After uploading, open each gallery image, copy its address (a `cdn.modrinth.com/data/...` URL),
-and swap it into the matching placeholder:
+The description already links all five. To swap one out, upload the replacement, open it in the
+gallery, copy its address (a `cdn.modrinth.com/data/...` URL) and replace the matching line:
 
-| Upload # | Placeholder in the description |
+| Image # | Where it appears |
 |---|---|
-| 1 | `PASTE_URL_1` |
-| 2 | `PASTE_URL_2` |
-| 3 | `PASTE_URL_3` |
-| 4 | `PASTE_URL_4` |
-| 5 | `PASTE_URL_5` |
+| 1 | ghost blocks and the verdict |
+| 2 | blockers seen through the ground |
+| 3 | the one-click build |
+| 4 | the finished beacon |
+| 5 | wheel positioning |
 
-The numbers line up, so `PASTE_URL_3` takes the URL of the third image you uploaded.
+The order here matches the order they appear in the description above.
 
 Two things to know about the GIFs:
 
