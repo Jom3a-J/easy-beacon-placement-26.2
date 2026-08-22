@@ -8,8 +8,15 @@ repositories {
 	}
 }
 
+// The harness is a second plugin, built into its own jar and dropped alongside the real one only
+// in the throwaway server the `runHarness` task starts. Nothing here can reach the published jar.
+sourceSets {
+	harness
+}
+
 dependencies {
 	compileOnly "io.papermc.paper:paper-api:${rootProject.paper_api_version}"
+	harnessCompileOnly "io.papermc.paper:paper-api:${rootProject.paper_api_version}"
 }
 
 processResources {
@@ -24,5 +31,103 @@ processResources {
 
 	filesMatching('plugin.yml') {
 		expand props
+	}
+}
+
+def harnessJar = tasks.register('harnessJar', Jar) {
+	archiveClassifier = 'harness'
+	from sourceSets.harness.output
+}
+
+/**
+ * Fetches a Paper server to test against, cached under build/. Paper is a server, not a library,
+ * so there is no sensible way to get one out of a Maven repository - the official route is their
+ * download API, and this pins nothing, deliberately: running against the current stable build is
+ * what catches Paper-side breakage early.
+ */
+def downloadPaper = tasks.register('downloadPaper') {
+	def target = layout.buildDirectory.file('paper/paper-server.jar')
+	def mcVersion = rootProject.minecraft_version
+	outputs.file(target)
+	outputs.upToDateWhen { target.get().asFile.exists() }
+
+	doLast {
+		def out = target.get().asFile
+		out.parentFile.mkdirs()
+
+		def api = "https://fill.papermc.io/v3/projects/paper/versions/${mcVersion}/builds"
+		def builds = new groovy.json.JsonSlurper().parse(new URL(api))
+		def download = builds[0].downloads['server:default']
+
+		logger.lifecycle("Downloading ${download.name} (${download.size} bytes)")
+		out.withOutputStream { os -> new URL(download.url).withInputStream { is -> os << is } }
+
+		def sha = java.security.MessageDigest.getInstance('SHA-256')
+			.digest(out.bytes).encodeHex().toString()
+
+		if (sha != download.checksums.sha256) {
+			throw new GradleException("Paper download checksum mismatch: got ${sha}")
+		}
+
+		logger.lifecycle('Paper checksum verified')
+	}
+}
+
+/**
+ * Boots a real Paper server with both plugins and lets the harness drive it. The harness stops the
+ * server itself and writes a result file; a failure makes this task fail, so it works unattended.
+ */
+tasks.register('runHarness', Exec) {
+	group = 'verification'
+	description = 'Runs the Paper plugin harness against a real Paper server.'
+
+	dependsOn downloadPaper, tasks.named('jar'), harnessJar
+
+	def runDir = layout.buildDirectory.dir('run-harness').get().asFile
+	def resultFile = new File(runDir, 'harness-result.txt')
+	def paperJar = layout.buildDirectory.file('paper/paper-server.jar').get().asFile
+	def launcher = javaToolchains.launcherFor {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+
+	// Paper is launched from its own jar manifest rather than a main class we name, so this is an
+	// Exec rather than a JavaExec - the latter always builds its own -cp invocation.
+	workingDir = runDir
+	commandLine launcher.get().executablePath.asFile.absolutePath,
+			'-Xmx2G', '-jar', paperJar.absolutePath, '--nogui'
+
+	doFirst {
+		runDir.mkdirs()
+		resultFile.delete()
+		new File(runDir, 'eula.txt').text = 'eula=true\n'
+		new File(runDir, 'server.properties').text = [
+			'level-type=minecraft\\:flat',
+			'online-mode=false',
+			'max-players=1',
+			'view-distance=6',
+			'allow-nether=false',
+			'spawn-protection=0'
+		].join('\n') + '\n'
+
+		def plugins = new File(runDir, 'plugins')
+		plugins.mkdirs()
+		plugins.listFiles()?.findAll { it.name.endsWith('.jar') }*.delete()
+		copy {
+			from tasks.named('jar').get().archiveFile, harnessJar.get().archiveFile
+			into plugins
+		}
+	}
+
+	doLast {
+		if (!resultFile.exists()) {
+			throw new GradleException('Paper harness produced no result - the server never ran it')
+		}
+
+		def result = resultFile.text.trim()
+		logger.lifecycle(result)
+
+		if (!result.startsWith('PASS')) {
+			throw new GradleException('Paper harness failed:\n' + result)
+		}
 	}
 }
