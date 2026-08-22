@@ -1,33 +1,8 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- **Every loader can now be tested without a person at the keyboard.** Fabric already had client
-  game tests; NeoForge and Paper had nothing, so their own wiring was only ever compiled — and the
-  block-place event both offer to land-claim mods had never once fired.
-  - `./gradlew :neoforge:runHarness` boots a headless dedicated server and drives the real builder
-    with NeoForge's `FakePlayer`, which extends `ServerPlayer`, so the code under test cannot tell
-    the difference. 16 checks.
-  - `./gradlew :paper:runHarness` downloads a Paper server, verifies its published checksum, and
-    runs a harness plugin against it. Bukkit has no `FakePlayer`, so the player is a proxy backed
-    by real state — the world, blocks, events and plugin logic all stay real. 18 checks.
-- Both prove the veto path the docs promise: a refused build leaves nothing behind and refunds
-  every block, and refusing a single position loses only that one — the per-block behaviour chosen
-  over an all-or-nothing multi-place event, now demonstrated rather than argued.
-- `./gradlew localCheck` runs the unit tests and both harnesses together, in about two minutes.
-- The test scaffolding is kept outside this repository, which ships the mod. Each piece carries its
-  own build wiring, so the tracked build does nothing at all when it is absent.
-- Both were verified by mutation: deleting the refund fails exactly the refund checks and nothing
-  else. They are run locally rather than in CI — booting real servers, and downloading one, is a
-  lot of time to spend on every push. CI still compiles every source set, so a harness cannot
-  quietly stop compiling between uses.
-
 ## 1.1.0
 
-Minecraft 26.2. Fixes, a large performance pass, protection-mod support on NeoForge, and a
-unit-test suite for the parts that had none.
+Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.
 
 ### Fixed
 
@@ -60,14 +35,13 @@ unit-test suite for the parts that had none.
   end the build. Moving now counts as progress and only a player who has actually stopped is given
   up on, with a twenty-second ceiling so a build cannot follow someone who has wandered off.
 - The claim that a beacon's tier is capped by the first incomplete layer *counting up from the
-  bottom* had it backwards, and had been copied into four places: `PlacementPlan`, the game test,
-  the README and the Modrinth page copy — the last two player-facing. Layers are numbered
+  bottom* had it backwards, and had been copied into the code, the README and the Modrinth page
+  copy — the last two player-facing. Layers are numbered
   downwards from the beacon, so the blocked layer **nearest the beacon** caps the result: losing the
   bottom layer of a tier-4 pyramid still leaves a working tier 3, while losing the 3x3 directly
   underneath leaves nothing at all. The code was always right and is unchanged; the comment was
-  wrong in the direction that invites someone to "fix" working code, and it is what sent four of
-  these new tests down the wrong path before they were corrected against real in-game behaviour.
-  The player-facing copies now say a beacon counts only the complete layers directly beneath it.
+  wrong in the direction that invites someone to "fix" working code. The player-facing copies now
+  say a beacon counts only the complete layers directly beneath it.
 
 ### Changed
 
@@ -97,26 +71,11 @@ unit-test suite for the parts that had none.
   `doWeatherCycle`, `doMobSpawning`, now `advance_time`, `advance_weather` and `spawn_mobs`). They
   failed as unknown arguments, and `/gamerule` reports that to chat rather than to the test, so the
   arena had quietly kept its day cycle and its mob spawning the whole time.
-- **Unit tests**, in a new `src/test` source set on the fabric and paper modules. They cover the
-  pure arithmetic the client game tests can only reach slowly and indirectly, and run in about a
-  second with no game client: pyramid geometry, colour parsing, and the packed-position wire format
-  the Paper plugin decodes by hand. That last one is the case worth having — get a shift wrong and
-  the plugin silently builds somewhere else entirely, and nothing else in the project would notice,
-  so the expected values are golden values taken from vanilla's real `BlockPos.asLong()` rather
-  than re-derived from the same shifts under test.
-- One test pins the ordering `PlacementPlan.compute` depends on: it scans the largest pyramid once
-  and treats a smaller tier as the tail of that scan, which only holds while positions come out
-  widest layer first. Reordering them would otherwise build the wrong layers, silently.
-- **`PlacementPlan.compute` is now testable**, and tested. It takes the terrain question as a
-  `TerrainReader` rather than reaching for block tags itself, which is what previously forced any
-  test of the planning arithmetic to boot most of the game. Seventeen tests now cover tier
-  selection, the material budget, and the effective-tier rules — the cases the client game tests
-  cannot cheaply reach, since those run with a creative inventory against terrain that is either
-  wholly free or wholly obstructed. Behaviour is unchanged; the live path hands in a reader that
-  reads the world.
-
-`build` depends on `check`, so the unit tests run in CI with no workflow change; the client
-game tests still need `./gradlew :fabric:runClientGameTest` and a display.
+- **`PlacementPlan.compute` takes the terrain as a parameter** rather than reading block states
+  itself, behind a small `TerrainReader`. Reading a block state means block tags, which mean a
+  loaded datapack, so asking the question inline made the planning arithmetic — tier selection, the
+  material budget, the effective-tier rules — reachable only by booting most of the game. Behaviour
+  is unchanged: the live path hands in a reader that reads the world.
 
 ### Performance
 

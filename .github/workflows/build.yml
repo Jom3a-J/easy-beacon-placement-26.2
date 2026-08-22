@@ -22,9 +22,8 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
-        # This repository holds the mod itself. The test scaffolding - unit tests, the client game
-        # tests, and the per-loader harnesses - lives outside it and is run locally before a
-        # release, so there is nothing here for CI to run beyond the build.
+        # This repository holds the mod itself; releases are checked by hand against a running game
+        # before going out, so there is nothing here for CI to run beyond the build.
         run: ./gradlew build
       - name: capture build artifacts
         uses: actions/upload-artifact@v7

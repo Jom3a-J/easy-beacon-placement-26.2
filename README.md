@@ -147,20 +147,11 @@ Jars land in `fabric/build/libs/`, `neoforge/build/libs/` and `paper/build/libs/
 
 ### Testing
 
-The test scaffolding is not in this repository. It is kept alongside the source on the machines
-that run it, and covers three levels:
-
-- **Unit tests** over the pure arithmetic — pyramid geometry, the packed-position wire format the
-  Paper plugin decodes by hand, and colour parsing. About a second, no game involved.
-- **A harness per loader**, each booting a real server and driving the real server-side builder.
-  NeoForge's uses its `FakePlayer`; Paper's downloads a Paper server, verifies its published
-  SHA-256, and runs a second plugin against it. Between them they cover the block-place event that
-  land-claim mods hook, including that a refused build is rolled back and every block refunded.
-- **Fabric client game tests**, which drive a real client and a real dedicated server — the only
-  level that can prove the hologram renders and that a click really puts blocks in the world.
-
-They run before a release rather than on every push, which is why the build here is just
-`./gradlew build`.
+There is no test scaffolding in this repository; it ships the mod. Releases are checked by hand
+against all three targets before going out — a Fabric client, a NeoForge client, and a real Paper
+server — because the parts most worth checking are the ones that only exist in a running game: that
+the hologram renders, that a click really puts blocks in the world, and that a land-claim plugin
+refusing a placement gets it rolled back and refunded.
 
 ### Project layout
 
