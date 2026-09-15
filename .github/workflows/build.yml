@@ -31,7 +31,7 @@ jobs:
           name: Artifacts
           # Jars are produced per platform module; the root project builds nothing itself.
           # The Paper plugin is a separate download for server owners, so it ships too.
+          # `neoforge` is out of the build until NeoForge ships 26.3 - see settings.gradle.
           path: |
             fabric/build/libs/
-            neoforge/build/libs/
             paper/build/libs/

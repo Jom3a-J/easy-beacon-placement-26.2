@@ -99,8 +99,10 @@ removes the reach limit.
 | Your setup | File | Also needs |
 |---|---|---|
 | Fabric / Quilt | `easy_beacon_placement-fabric-*.jar` → `mods/` | **Fabric API** |
-| NeoForge | `easy_beacon_placement-neoforge-*.jar` → `mods/` | nothing |
 | Paper / Spigot server | `easy_beacon_placement-paper-*.jar` → `plugins/` | nothing |
+
+**NeoForge is not available for 26.3 yet** — NeoForge has not shipped a 26.3 build for mods to
+target. The 26.2 NeoForge file is still up and still works on 26.2.
 
 Mismatched setups are fine in both directions — a client with the mod can join a server without it,
 and vice versa. Nothing is registered as required, so nobody gets kicked.
@@ -143,8 +145,8 @@ MIT licensed. By **Jom3a**.
 | Field | Value |
 |---|---|
 | Environments | Client **required**, server **optional** |
-| Loaders | Fabric, Quilt, NeoForge, Paper, Spigot |
-| Game versions | 26.2 |
+| Loaders | Fabric, Quilt, Paper, Spigot — add NeoForge back when it ships 26.3 |
+| Game versions | 26.3 (26.2 remains on the older files) |
 | Licence | MIT |
 | Categories | Utility, Game Mechanics *(consider Management)* |
 

@@ -77,8 +77,12 @@ removes the reach limit.
 | Your setup | File | Also needs |
 |---|---|---|
 | Fabric / Quilt | `easy_beacon_placement-fabric-*.jar` → `mods/` | **Fabric API** |
-| NeoForge | `easy_beacon_placement-neoforge-*.jar` → `mods/` | nothing |
 | Paper / Spigot server | `easy_beacon_placement-paper-*.jar` → `plugins/` | nothing |
+
+**NeoForge is not available for 26.3 yet.** NeoForge itself has not shipped a 26.3 build, so there
+is nothing to compile against; the last NeoForge release of this mod targets 26.2. The module is
+still in the tree and the 26.3 work it needs is already done in the shared code, so it comes back
+as soon as upstream does.
 
 Mismatched setups are fine in both directions — a client with the mod can join a server without it,
 and vice versa. Nothing is registered as required, so nobody gets kicked.
@@ -143,12 +147,14 @@ Requires **JDK 25**.
 ./gradlew build
 ```
 
-Jars land in `fabric/build/libs/`, `neoforge/build/libs/` and `paper/build/libs/`.
+Jars land in `fabric/build/libs/` and `paper/build/libs/`. The `neoforge` module is commented out
+of `settings.gradle` until NeoForge ships a 26.3 build — see the note there for what re-enabling it
+takes.
 
 ### Testing
 
 There is no test scaffolding in this repository; it ships the mod. Releases are checked by hand
-against all three targets before going out — a Fabric client, a NeoForge client, and a real Paper
+against every target that has a build before going out — currently a Fabric client and a real Paper
 server — because the parts most worth checking are the ones that only exist in a running game: that
 the hologram renders, that a click really puts blocks in the world, and that a land-claim plugin
 refusing a placement gets it rolled back and refunded.
