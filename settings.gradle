@@ -20,5 +20,13 @@ rootProject.name = 'easy_beacon_placement'
 // platform modules pull in via `sourceSets.main.java.srcDir`, so each platform builds it with
 // its own toolchain and there is no cross-loader build plugin to break on new Minecraft versions.
 include 'fabric'
-include 'neoforge'
 include 'paper'
+
+// `neoforge` is deliberately not included while the mod targets 26.3. NeoForge has no 26.3 build
+// yet - upstream's newest is still the 26.2 line - and because both loaders compile the same
+// sources out of `common`, there is no arrangement in which one targets 26.3 and the other 26.2.
+// The module is left in the tree untouched: re-add this line once a 26.3 NeoForge ships, set
+// `neoforge_version` in gradle.properties, and widen the ranges in neoforge.mods.toml. The 26.3
+// API changes all landed in `common`, which the NeoForge module already shares, so it should need
+// nothing of its own beyond an access transformer mirroring the Fabric access widener.
+// include 'neoforge'

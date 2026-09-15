@@ -12,6 +12,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Prediction;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -185,9 +186,12 @@ public final class ServerPyramidBuilder {
 	 * <p>Vanilla's own "put this back, and drop whatever will not fit" helper. Quietly voiding it
 	 * would be the worse failure: an inventory is at its fullest exactly when a build has just been
 	 * refused.
+	 *
+	 * <p>{@code SERVER_ONLY} because this runs on the server with no matching client-side guess to
+	 * reconcile against - the same constant vanilla passes from its own server-side container code.
 	 */
 	private static void giveBack(ServerPlayer player, ItemStack stack) {
-		player.getInventory().placeItemBackInInventory(stack);
+		player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
 	}
 
 	private static boolean isCloseEnough(ServerPlayer player, BlockPos beaconPos) {

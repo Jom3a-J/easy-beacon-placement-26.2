@@ -1,0 +1,10 @@
+accessWidener	v2	official
+
+# 26.3 moved rendering onto the renderpearl backend and deleted the text-background pipelines.
+# RenderTypes.textBackgroundSeeThrough() went with them, and it was the only stock render type
+# that drew untextured POSITION_COLOR quads with no depth test - what the hologram uses to show
+# obstructions buried in terrain.
+#
+# The replacement pipeline is built entirely from public API (see EbpRenderTypes); the one piece
+# vanilla keeps to itself is the call that wraps a RenderSetup into a RenderType.
+accessible	method	net/minecraft/client/renderer/rendertype/RenderType	create	(Ljava/lang/String;Lnet/minecraft/client/renderer/rendertype/RenderSetup;)Lnet/minecraft/client/renderer/rendertype/RenderType;

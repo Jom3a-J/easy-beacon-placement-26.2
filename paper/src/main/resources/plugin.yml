@@ -1,7 +1,7 @@
 name: EasyBeaconPlacement
 version: '${version}'
 main: com.jom3a.easybeacon.paper.EasyBeaconPlacementPlugin
-api-version: '26.2'
+api-version: '26.3'
 author: ${mod_author}
 description: >-
   Server half of Easy Beacon Placement. Optional: without it, clients with the mod still work but

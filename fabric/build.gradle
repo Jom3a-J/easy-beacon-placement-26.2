@@ -2,6 +2,12 @@ plugins {
 	id 'net.fabricmc.fabric-loom'
 }
 
+loom {
+	// Opens RenderType.create so the hologram can rebuild the see-through box type that 26.3
+	// removed. See the file itself for why.
+	accessWidenerPath = file('src/main/resources/easy_beacon_placement.accesswidener')
+}
+
 dependencies {
 	// No `mappings` line: 26.x ships unobfuscated.
 	minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"

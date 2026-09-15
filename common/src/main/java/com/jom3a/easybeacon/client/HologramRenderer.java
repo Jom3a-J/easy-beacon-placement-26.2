@@ -34,9 +34,13 @@ import net.minecraft.world.phys.shapes.Shapes;
  *
  * <p>Obstructions are drawn differently on purpose. They are almost always buried inside terrain,
  * and the whole point of showing them is to answer "what is in my way?" — so they use
- * {@link RenderTypes#textBackgroundSeeThrough()}, whose pipeline sets no depth-stencil state at
- * all and therefore draws through solid blocks. It takes the same {@code POSITION_COLOR} quads as
- * the ordinary debug box, so it is a straight swap.
+ * {@link EbpRenderTypes#seeThroughFilledBox()}, whose pipeline sets no depth-stencil state at all
+ * and therefore draws through solid blocks. It takes the same {@code POSITION_COLOR} quads as the
+ * ordinary debug box, so it is a straight swap.
+ *
+ * <p>26.3 note: that render type used to be vanilla's {@code textBackgroundSeeThrough()}. The
+ * renderpearl rewrite removed it and left no stock equivalent, so the mod builds its own — see
+ * {@link EbpRenderTypes}.
  *
  * <p>26.2 note: {@code MultiBufferSource} is gone, so geometry is handed to a
  * {@link SubmitNodeCollector}. Both Fabric and NeoForge supply the same vanilla
@@ -183,7 +187,7 @@ public final class HologramRenderer {
 
 		collector.submitCustomGeometry(
 				poseStack,
-				throughWalls ? RenderTypes.textBackgroundSeeThrough() : RenderTypes.debugFilledBox(),
+				throughWalls ? EbpRenderTypes.seeThroughFilledBox() : RenderTypes.debugFilledBox(),
 				(pose, consumer) -> emitBox(pose, consumer, min, max, colour));
 
 		poseStack.popPose();
