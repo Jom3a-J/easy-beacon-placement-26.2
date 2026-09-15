@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.2.0
+
+Minecraft 26.3.
+
+### Changed
+
+- **Updated to Minecraft 26.3.** Fabric and the Paper plugin both target it. No behaviour changes:
+  everything the mod does is the same, the work was in following what 26.3 moved.
+- **The hologram's see-through obstruction boxes are now drawn by the mod's own render type.** 26.3
+  replaced the rendering backend and removed `textBackgroundSeeThrough()`, which was the only stock
+  render type that drew untextured coloured quads with no depth test — what showing blocks buried
+  in terrain requires. Nothing stock replaces it: every remaining see-through type is textured and
+  every remaining untextured one depth tests. The mod now builds an equivalent itself, a copy of
+  vanilla's debug filled box with its depth test dropped, so obstructions look exactly as they did.
+- Key bindings no longer reference GLFW directly; 26.3 exposes the key codes itself.
+- Requires Fabric Loader 0.19.5 or newer, and Fabric API for 26.3.
+
+### Known gaps
+
+- **No NeoForge build for 26.3.** NeoForge has not released one, so there is nothing to build
+  against — its newest is still the 26.2 line. The 26.3 changes all landed in the code both loaders
+  share, so the NeoForge jar should return shortly after NeoForge itself does. The 26.2 NeoForge
+  release is unaffected and stays up.
+- The Paper plugin is built against a 26.3 Paper API that upstream still marks alpha, being the
+  only 26.3 build published. It uses nothing but long-stable Bukkit API, and the jar also runs
+  unchanged on 26.2 servers.
+
 ## 1.1.0
 
 Minecraft 26.2. Fixes, a large performance pass, and protection-mod support on NeoForge.
