@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.1
+
+Adds the NeoForge build for 26.3. Nothing else changes — the Fabric and Paper jars are the same
+mod as 1.2.0, rebuilt.
+
+### Added
+
+- **NeoForge build for 26.3.** 1.2.0 shipped without one because NeoForge had not released anything
+  for 26.3 to build against. It has now, so the NeoForge jar is back. The 26.3 work was already
+  done: it all lives in the code both loaders share, so this needed only the loader's own version
+  bump, its declared game-version range widened to 26.3, and an access transformer mirroring the
+  access widener Fabric uses to rebuild the see-through hologram boxes.
+
+### Notes
+
+- NeoForge for 26.3 is still beta upstream, as the 26.2 line was when this mod shipped against it.
+
 ## 1.2.0
 
 Minecraft 26.3.
