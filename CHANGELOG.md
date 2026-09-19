@@ -13,6 +13,13 @@ mod as 1.2.0, rebuilt.
   bump, its declared game-version range widened to 26.3, and an access transformer mirroring the
   access widener Fabric uses to rebuild the see-through hologram boxes.
 
+### Fixed
+
+- **NeoForge showed a warning screen on startup.** 26.3 split the old `logoFile` mod property into
+  a square `iconFile` and a wide `bannerFile`. The mod still used the old name, so NeoForge loaded
+  it but stopped at "1 warning has occurred during loading" on the way in — harmless, and every
+  NeoForge user would have seen it. The icon is a square 128x128, so it now uses `iconFile`.
+
 ### Notes
 
 - NeoForge for 26.3 is still beta upstream, as the 26.2 line was when this mod shipped against it.
