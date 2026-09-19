@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.1
+
+Adds the NeoForge build for 26.3. Nothing else changes — the Fabric and Paper jars are the same
+mod as 1.2.0, rebuilt.
+
+### Added
+
+- **NeoForge build for 26.3.** 1.2.0 shipped without one because NeoForge had not released anything
+  for 26.3 to build against. It has now, so the NeoForge jar is back. The 26.3 work was already
+  done: it all lives in the code both loaders share, so this needed only the loader's own version
+  bump, its declared game-version range widened to 26.3, and an access transformer mirroring the
+  access widener Fabric uses to rebuild the see-through hologram boxes.
+
+### Fixed
+
+- **NeoForge showed a warning screen on startup.** 26.3 split the old `logoFile` mod property into
+  a square `iconFile` and a wide `bannerFile`. The mod still used the old name, so NeoForge loaded
+  it but stopped at "1 warning has occurred during loading" on the way in — harmless, and every
+  NeoForge user would have seen it. The icon is a square 128x128, so it now uses `iconFile`.
+
+### Notes
+
+- NeoForge for 26.3 is still beta upstream, as the 26.2 line was when this mod shipped against it.
+
 ## 1.2.0
 
 Minecraft 26.3.
