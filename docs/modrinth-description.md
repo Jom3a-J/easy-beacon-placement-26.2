@@ -151,6 +151,16 @@ MIT licensed. By **Jom3a**.
 Setting the server environment to **optional** matters. Mark it required and people on vanilla or
 Paper servers will assume they cannot use it, when in fact the client half works everywhere.
 
+All three jars go under a **single version**. A Modrinth version holds several files and several
+loaders at once, so one 1.2.1 version carrying the Fabric, NeoForge and Paper jars is the whole
+release - there is no reason to split it per loader.
+
+1.2.0 was never uploaded here, so 1.2.1 is the page's first 26.3 version. Nothing is lost by
+skipping it: it stood for four days and shipped without a NeoForge jar, which 1.2.1 restores.
+
+The existing 26.2 versions stay up and keep working. Adding a 26.3 version does not retire them,
+and players on 26.2 continue to be served by what is already there.
+
 ## Screenshots
 
 The five images are already uploaded and linked in the description above, so this section is a
